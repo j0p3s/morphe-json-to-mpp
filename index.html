@@ -4,7 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Morphe JSON to MPP</title>
-<meta name="description" content="Turn a Morphe patches-bundle.json (or a link to one) into a downloadable .mpp patch bundle and add-source links for Morphe Desktop and Morphe Android.">
+<meta name="description" content="Turn a Morphe patches-bundle.json, a link to one, or a repository into a downloadable .mpp patch bundle plus add-source links for Morphe Desktop and Morphe Android. Validates the JSON and checks the .mpp exists.">
+<meta name="theme-color" content="#4f46e5">
+<link rel="canonical" href="https://j0p3s.github.io/morphe-json-to-mpp/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Morphe JSON → MPP">
+<meta property="og:description" content="Get the .mpp from a Morphe patches-bundle.json or repository, with add-source links for Morphe Android and Desktop.">
+<meta property="og:url" content="https://j0p3s.github.io/morphe-json-to-mpp/">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Cpath d='M9 16h11m-4-5 5 5-5 5' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
 <style>
   :root {
@@ -18,6 +26,7 @@
     --accent-text: #ffffff;
     --accent-soft: #eceafe;
     --ok: #12805c;
+    --warn: #a15c00;
     --err: #c0362c;
     --err-soft: #fdecea;
     --code: #eef0f6;
@@ -35,6 +44,7 @@
       --accent-text: #0e1017;
       --accent-soft: #24234a;
       --ok: #4cc79a;
+      --warn: #f2b13c;
       --err: #ff8a80;
       --err-soft: #3a1d1d;
       --code: #222738;
@@ -52,6 +62,7 @@
     --accent-text: #0e1017;
     --accent-soft: #24234a;
     --ok: #4cc79a;
+    --warn: #f2b13c;
     --err: #ff8a80;
     --err-soft: #3a1d1d;
     --code: #222738;
@@ -125,9 +136,31 @@
   .btn.primary:hover { filter: brightness(1.08); }
   .chip { padding: 4px 10px; font-size: .82rem; font-weight: 500; border-radius: 999px; }
 
-  .status { font-size: .9rem; color: var(--muted); min-height: 1.4em; }
+  .status { font-size: .9rem; color: var(--muted); min-height: 1.4em; overflow-wrap: anywhere; }
   .status.err { color: var(--err); }
+  .status.warn { color: var(--warn); }
   .status.ok { color: var(--ok); }
+  .status a { font-weight: 600; }
+
+  .checks { list-style: none; margin: 8px 0 0; padding: 0; font-size: .9rem; }
+  .checks li { display: flex; gap: 8px; padding: 5px 0; border-top: 1px solid var(--border); overflow-wrap: anywhere; }
+  .checks li:first-child { border-top: 0; }
+  .checks .icon { flex: none; width: 1.2em; text-align: center; font-weight: 700; }
+  .checks .ok .icon { color: var(--ok); }
+  .checks .warn .icon { color: var(--warn); }
+  .checks .err .icon { color: var(--err); }
+  .checks .info .icon, .checks .pending .icon { color: var(--muted); }
+  .checks .pending { color: var(--muted); }
+  .checks li.code { border-top: 0; padding-top: 0; }
+  .checks pre {
+    margin: 0 0 0 calc(1.2em + 8px);
+    padding: 8px 10px;
+    background: var(--code);
+    border-radius: 8px;
+    overflow-x: auto;
+    font: 12px/1.45 ui-monospace, "JetBrains Mono", Consolas, monospace;
+    max-width: calc(100% - 1.2em - 8px);
+  }
 
   .meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
   .badge {
@@ -175,27 +208,55 @@
     color: var(--muted);
     font-size: .88rem;
   }
-  .note.warn { background: var(--err-soft); color: var(--err); }
 
   details summary { cursor: pointer; font-weight: 600; }
   .changelog { margin-top: 10px; max-height: 420px; overflow: auto; font-size: .9rem; overflow-wrap: anywhere; }
   .changelog h3, .changelog h4 { margin: 14px 0 6px; font-size: .95rem; }
   .changelog ul { margin: 0; padding-left: 20px; }
 
+  .search {
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--surface-2);
+    color: var(--text);
+    padding: 9px 12px;
+    font: inherit;
+  }
+  .sources { list-style: none; margin: 10px 0 0; padding: 0; max-height: 460px; overflow-y: auto; }
+  .sources li {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 4px;
+    border-top: 1px solid var(--border);
+  }
+  .sources li:first-child { border-top: 0; }
+  .sources li.active { background: var(--accent-soft); border-radius: 8px; }
+  .sources .name { font-weight: 600; overflow-wrap: anywhere; }
+  .sources .where { color: var(--muted); font-size: .82rem; overflow-wrap: anywhere; }
+  .sources .actions { display: flex; gap: 6px; flex: none; }
+  .sources .actions .btn, .sources .actions button { padding: 5px 10px; font-size: .84rem; }
+  @media (max-width: 520px) {
+    .sources li { flex-direction: column; align-items: stretch; }
+  }
+
   .hidden { display: none !important; }
   footer { color: var(--muted); font-size: .85rem; margin-top: 28px; text-align: center; }
+  footer a { color: var(--muted); }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
     <h1>Morphe JSON → MPP</h1>
-    <p>Paste a <code>patches-bundle.json</code>, a link to one, or a GitHub/GitLab repository. You get the <code>.mpp</code> patch bundle plus ready-made links for Morphe Desktop and Morphe Android.</p>
+    <p>Paste a <code>patches-bundle.json</code>, a link to one, a GitHub/GitLab repository, or a Morphe Manager settings export. You get the <code>.mpp</code> patch bundle plus ready-made links for Morphe Desktop and Morphe Android.</p>
   </header>
 
   <section class="card drop" id="drop">
     <h2>Input</h2>
-    <p class="sub">Converts automatically. You can also drop a <code>.json</code> file here.</p>
+    <p class="sub">Converts automatically. Paste JSON, or a link to a JSON file on GitHub, GitLab, Codeberg, a Gist, jsDelivr or any site that allows it. You can also drop a <code>.json</code> file here.</p>
     <textarea id="input" spellcheck="false" autocomplete="off" placeholder="https://github.com/MorpheApp/morphe-patches&#10;https://raw.githubusercontent.com/owner/repo/main/patches-bundle.json&#10;{ &quot;download_url&quot;: &quot;…/patches-1.0.0.mpp&quot;, &quot;version&quot;: &quot;1.0.0&quot; }"></textarea>
     <div class="row space mt">
       <div class="row">
@@ -207,9 +268,22 @@
       <div class="row">
         <span class="status" style="margin-right:4px">Try:</span>
         <button type="button" class="chip" data-example="https://github.com/MorpheApp/morphe-patches">Morphe patches</button>
+        <button type="button" class="chip" data-example="https://raw.githubusercontent.com/MorpheApp/morphe-patches/main/patches-bundle.json">JSON link</button>
       </div>
     </div>
     <div class="status mt" id="status" role="status" aria-live="polite"></div>
+  </section>
+
+  <section class="card hidden" id="list-card">
+    <h2>Patch sources <span class="badge" id="list-count"></span></h2>
+    <p class="sub">From a Morphe Manager settings export. Pick a source to get its <code>.mpp</code> and links.</p>
+    <input type="search" class="search" id="list-filter" placeholder="Filter by name or repository…" aria-label="Filter sources">
+    <ul class="sources" id="sources"></ul>
+  </section>
+
+  <section class="card hidden" id="checks-card">
+    <h2>Checks</h2>
+    <ul class="checks" id="checks"></ul>
   </section>
 
   <div id="result" class="hidden">
@@ -284,7 +358,10 @@
     </section>
   </div>
 
-  <footer>Runs entirely in your browser. Not affiliated with Morphe.</footer>
+  <footer>
+    Runs entirely in your browser · <a href="https://github.com/j0p3s/morphe-json-to-mpp" rel="noopener">Source on GitHub</a> · MIT<br>
+    Not affiliated with Morphe. Only add patch sources you trust.
+  </footer>
 </div>
 
 <script>
@@ -294,37 +371,128 @@
   const BUNDLE_FILE = "patches-bundle.json";
   const BRANCHES = ["main", "dev"];
   const ADD_SOURCE = "https://morphe.software/add-source";
+  const MAX_BYTES = 5 * 1024 * 1024;
+  const KNOWN_FIELDS = ["version", "created_at", "description", "download_url", "signature_download_url", "public_key"];
+  const HOSTS = { github: "github.com", gitlab: "gitlab.com", codeberg: "codeberg.org" };
+  const ICONS = { ok: "✓", warn: "!", err: "✗", info: "•", pending: "…" };
 
   const $ = (id) => document.getElementById(id);
   const input = $("input");
   const status = $("status");
   let runId = 0;
+  let checks = [];
+
+  // Error shown to the user, optionally with check lines and a link to open.
+  class InputError extends Error {
+    constructor(message, extra = {}) {
+      super(message);
+      this.checks = extra.checks || null;
+      this.openUrl = extra.openUrl || null;
+    }
+  }
 
   // ---------- helpers ----------
 
-  function setStatus(text, kind) {
+  function setStatus(text, kind, openUrl) {
     status.textContent = text || "";
     status.className = "status mt" + (kind ? " " + kind : "");
+    if (openUrl) {
+      const a = document.createElement("a");
+      a.href = openUrl;
+      a.target = "_blank";
+      a.rel = "noopener";
+      a.textContent = "Open the link ↗";
+      status.append(" ", a);
+    }
   }
 
-  async function fetchJson(url) {
+  function showChecks(list) {
+    checks = list || [];
+    $("checks-card").classList.toggle("hidden", !checks.length);
+    $("checks").innerHTML = checks.map(([kind, text]) => kind === "code"
+      ? '<li class="code"><pre>' + escapeHtml(text) + "</pre></li>"
+      : '<li class="' + kind + '"><span class="icon" aria-hidden="true">' + ICONS[kind] + "</span><span>" + escapeHtml(text) + "</span></li>"
+    ).join("");
+  }
+
+  function hostOf(url) {
+    try { return new URL(url).hostname; } catch { return url; }
+  }
+
+  function fmtSize(n) {
+    if (n < 1024) return n + " B";
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + " KB";
+    return (n / 1024 / 1024).toFixed(1) + " MB";
+  }
+
+  function jsonErrorLocation(message, text) {
+    let line, col, m;
+    if ((m = message.match(/line (\d+) column (\d+)/))) {
+      line = +m[1];
+      col = +m[2];
+    } else if ((m = message.match(/position (\d+)/))) {
+      const before = text.slice(0, +m[1]).split("\n");
+      line = before.length;
+      col = before[before.length - 1].length + 1;
+    } else {
+      return null;
+    }
+    const src = text.split("\n")[line - 1] || "";
+    const start = Math.max(0, col - 40);
+    const prefix = start ? "…" : "";
+    const snippet = prefix + src.slice(start, col + 40) + "\n" + " ".repeat(prefix.length + col - 1 - start) + "^";
+    return { line, col, snippet };
+  }
+
+  function parseJson(text, what) {
+    text = text.replace(/^﻿/, "").trim();
+    if (!text) {
+      throw new InputError(what + " is empty.", { checks: [["err", "Empty: there is no JSON to read"]] });
+    }
+    if (text.startsWith("<")) {
+      throw new InputError(what + " is a web page or HTML, not JSON. Link to the raw .json file instead (on GitHub, use the Raw button).", {
+        checks: [["err", "Not JSON: received HTML"]],
+      });
+    }
+    try {
+      return JSON.parse(text);
+    } catch (e) {
+      const loc = jsonErrorLocation(e.message, text);
+      const at = loc ? " at line " + loc.line + ", column " + loc.col : "";
+      const reason = e.message
+        .replace(/^JSON\.parse:\s*/, "")
+        .replace(/\s*(in JSON )?at position \d+.*$/, "")
+        .replace(/\s*at line \d+ column \d+.*$/, "");
+      const list = [["err", "Invalid JSON" + at + ": " + reason]];
+      if (loc) list.push(["code", loc.snippet]);
+      throw new InputError(what + " is not valid JSON" + at + ".", { checks: list });
+    }
+  }
+
+  // Fetches a URL and parses it as JSON. shownUrl is what the user gave us.
+  async function fetchJson(url, shownUrl = url) {
+    const host = hostOf(shownUrl);
     let res;
     try {
       res = await fetch(url, { cache: "no-store" });
     } catch {
-      throw new Error("Could not reach " + url + " (network or CORS). Paste the JSON contents instead.");
+      throw new InputError(host + " doesn't let other websites read its files, so the JSON can't be fetched here. Open the link, copy all of it and paste it into the box instead.", { openUrl: shownUrl });
     }
-    if (!res.ok) throw new Error("HTTP " + res.status + " for " + url);
+    if (hostOf(url) === "api.github.com" && (res.status === 403 || res.status === 429)) {
+      throw new InputError("GitHub's API limit was reached (60 requests an hour). Try again later, or paste the patches-bundle.json link or contents.");
+    }
+    if (res.status === 404) throw new InputError("Nothing was found at " + shownUrl + " (404). Check the link, and that the repository is public.");
+    if (!res.ok) throw new InputError(host + " answered with HTTP " + res.status + ".");
+    if (+res.headers.get("content-length") > MAX_BYTES) {
+      throw new InputError("That file is " + fmtSize(+res.headers.get("content-length")) + ", far too large for a patches-bundle.json.");
+    }
     const text = await res.text();
-    try {
-      return JSON.parse(text);
-    } catch {
-      throw new Error("The file at " + url + " is not valid JSON.");
-    }
+    if (text.length > MAX_BYTES) throw new InputError("That file is " + fmtSize(text.length) + ", far too large for a patches-bundle.json.");
+    return { json: parseJson(text, "The file at " + host), bytes: new Blob([text]).size };
   }
 
   async function tryFetchJson(url) {
-    try { return await fetchJson(url); } catch { return null; }
+    try { return (await fetchJson(url)).json; } catch { return null; }
   }
 
   function fileName(url) {
@@ -341,7 +509,15 @@
     return m ? m[1] : "";
   }
 
-  // Repo info from any GitHub/GitLab URL: { provider, repo, branch?, path? }
+  // Splits "<branch>/<path>" segments, allowing GitHub's "refs/heads/<branch>/<path>" form.
+  function branchAndPath(seg) {
+    if (seg[0] === "refs" && (seg[1] === "heads" || seg[1] === "tags") && seg.length >= 4) {
+      return { branch: seg[2], path: seg.slice(3).join("/") };
+    }
+    return { branch: seg[0], path: seg.slice(1).join("/") };
+  }
+
+  // Repo info from a GitHub/GitLab/Codeberg URL: { provider, repo, branch?, path?, tag? }
   function repoFromUrl(raw) {
     let u;
     try { u = new URL(raw); } catch { return null; }
@@ -349,14 +525,11 @@
     const seg = u.pathname.split("/").filter(Boolean).map(decodeURIComponent);
 
     if (host === "raw.githubusercontent.com" && seg.length >= 4) {
-      return { provider: "github", repo: seg[0] + "/" + seg[1], branch: seg[2], path: seg.slice(3).join("/") };
+      return { provider: "github", repo: seg[0] + "/" + seg[1], ...branchAndPath(seg.slice(2)) };
     }
     if ((host === "github.com" || host === "www.github.com") && seg.length >= 2) {
       const info = { provider: "github", repo: seg[0] + "/" + seg[1].replace(/\.git$/, "") };
-      if ((seg[2] === "blob" || seg[2] === "raw") && seg.length >= 5) {
-        info.branch = seg[3];
-        info.path = seg.slice(4).join("/");
-      }
+      if ((seg[2] === "blob" || seg[2] === "raw") && seg.length >= 5) Object.assign(info, branchAndPath(seg.slice(3)));
       if (seg[2] === "releases" && seg[3] === "tag" && seg[4]) info.tag = seg[4];
       return info;
     }
@@ -370,14 +543,27 @@
       }
       return info;
     }
+    if (host === "codeberg.org" && seg.length >= 2) {
+      const info = { provider: "codeberg", repo: seg[0] + "/" + seg[1] };
+      // codeberg.org/owner/repo/{raw|src}/{branch|tag|commit}/<ref>/<path>
+      if ((seg[2] === "raw" || seg[2] === "src") && ["branch", "tag", "commit"].includes(seg[3]) && seg.length >= 6) {
+        info.branch = seg[4];
+        info.path = seg.slice(5).join("/");
+      }
+      return info;
+    }
     return null;
   }
 
   function rawUrl(info, branch, path) {
+    const encPath = path.split("/").map(encodeURIComponent).join("/");
     if (info.provider === "github") {
-      return "https://raw.githubusercontent.com/" + info.repo + "/" + encodeURIComponent(branch) + "/" + path.split("/").map(encodeURIComponent).join("/");
+      return "https://raw.githubusercontent.com/" + info.repo + "/" + encodeURIComponent(branch) + "/" + encPath;
     }
-    // GitLab's raw endpoint has no CORS headers, its API does.
+    // GitLab's and Codeberg's raw endpoints have no CORS headers, their APIs do.
+    if (info.provider === "codeberg") {
+      return "https://codeberg.org/api/v1/repos/" + info.repo + "/raw/" + encPath + "?ref=" + encodeURIComponent(branch);
+    }
     return "https://gitlab.com/api/v4/projects/" + encodeURIComponent(info.repo) +
       "/repository/files/" + encodeURIComponent(path) + "/raw?ref=" + encodeURIComponent(branch);
   }
@@ -395,16 +581,15 @@
     };
   }
 
-  // ---------- resolve input → { bundle, source } ----------
+  // ---------- resolve input → { bundle, source, from, bytes } ----------
 
   async function resolve(text) {
     text = text.trim();
     if (!text) return null;
 
-    if (text.startsWith("{") || text.startsWith("[")) {
-      let json;
-      try { json = JSON.parse(text); } catch (e) { throw new Error("That JSON doesn't parse: " + e.message); }
-      return { bundle: json, source: null };
+    // Anything that isn't a single URL-ish token is treated as JSON, so typos get a JSON error.
+    if (text.startsWith("{") || text.startsWith("[") || /\s/.test(text)) {
+      return { bundle: parseJson(text, "The pasted text"), source: null, from: null, bytes: new Blob([text]).size };
     }
 
     // Bare "owner/repo" means GitHub, same as Morphe Desktop.
@@ -414,14 +599,15 @@
     if (!/^https?:\/\//i.test(text)) text = "https://" + text;
 
     let url;
-    try { url = new URL(text); } catch { throw new Error("That isn't a URL or JSON."); }
+    try { url = new URL(text); } catch { throw new InputError("That isn't valid JSON or a link."); }
     const href = url.href;
+    const host = url.hostname.toLowerCase();
 
     // Morphe add-source link
-    if (url.hostname === "morphe.software" && url.pathname.startsWith("/add-source")) {
+    if (host === "morphe.software" && url.pathname.startsWith("/add-source")) {
       const gh = url.searchParams.get("github");
       const gl = url.searchParams.get("gitlab");
-      if (!gh && !gl) throw new Error("That add-source link has no github= or gitlab= repository.");
+      if (!gh && !gl) throw new InputError("That add-source link has no github= or gitlab= repository.");
       return resolveRepo({ provider: gh ? "github" : "gitlab", repo: gh || gl });
     }
 
@@ -431,41 +617,293 @@
       return {
         bundle: { download_url: href, version: versionFromName(name) },
         source: repoFromUrl(href),
+        from: null,
+        bytes: 0,
+        direct: true,
+      };
+    }
+
+    // Gist page → the gist's JSON file, read through the API.
+    if (host === "gist.github.com") {
+      const seg = url.pathname.split("/").filter(Boolean);
+      const id = seg.length >= 2 ? seg[1] : seg[0];
+      if (!id) throw new InputError("That Gist link has no Gist ID.");
+      const gist = (await fetchJson("https://api.github.com/gists/" + encodeURIComponent(id), href)).json;
+      const files = Object.values(gist.files || {});
+      const file = files.find((f) => f.filename === BUNDLE_FILE) || files.find((f) => /\.json$/i.test(f.filename)) || files[0];
+      if (!file) throw new InputError("That Gist has no files.");
+      if (file.truncated) return { ...(await fetchFile(file.raw_url, href)), source: null };
+      return {
+        bundle: parseJson(file.content || "", "The Gist file " + file.filename),
+        source: null,
+        from: href,
+        bytes: file.size || 0,
       };
     }
 
     const info = repoFromUrl(href);
     if (info) {
       if (info.path) {
-        const json = await fetchJson(rawUrl(info, info.branch, info.path));
-        return { bundle: json, source: info };
+        const out = await fetchFile(rawUrl(info, info.branch, info.path), href);
+        return { ...out, source: info };
       }
       if (info.tag && info.provider === "github") {
-        const rel = await fetchJson("https://api.github.com/repos/" + info.repo + "/releases/tags/" + encodeURIComponent(info.tag));
+        const rel = (await fetchJson("https://api.github.com/repos/" + info.repo + "/releases/tags/" + encodeURIComponent(info.tag), href)).json;
         const bundle = bundleFromRelease(rel);
-        if (!bundle) throw new Error("Release " + info.tag + " has no .mpp file attached.");
-        return { bundle, source: info };
+        if (!bundle) throw new InputError("Release " + info.tag + " has no .mpp file attached.");
+        return { bundle, source: info, from: null, bytes: 0, release: true };
       }
       return resolveRepo(info);
     }
 
-    // Any other URL: hope it serves JSON with CORS.
-    return { bundle: await fetchJson(href), source: null };
+    // Any other URL: works if that server allows cross-origin reads.
+    return { ...(await fetchFile(href)), source: null };
+  }
+
+  async function fetchFile(url, shownUrl = url) {
+    const { json, bytes } = await fetchJson(url, shownUrl);
+    return { bundle: json, from: shownUrl, bytes };
   }
 
   async function resolveRepo(info) {
+    if (info.provider === "codeberg") {
+      throw new InputError("Codeberg repositories can't be added to Morphe. Link to the patches-bundle.json file itself instead.");
+    }
     for (const branch of BRANCHES) {
-      const json = await tryFetchJson(rawUrl(info, branch, BUNDLE_FILE));
+      const url = rawUrl(info, branch, BUNDLE_FILE);
+      const json = await tryFetchJson(url);
       if (json && json.download_url) {
-        return { bundle: json, source: { ...info, branch, path: BUNDLE_FILE } };
+        return { bundle: json, source: { ...info, branch, path: BUNDLE_FILE }, from: url, bytes: JSON.stringify(json).length };
       }
     }
     if (info.provider === "github") {
       const rel = await tryFetchJson("https://api.github.com/repos/" + info.repo + "/releases/latest");
       const bundle = rel && bundleFromRelease(rel);
-      if (bundle) return { bundle, source: info };
+      if (bundle) return { bundle, source: info, from: null, bytes: 0, release: true };
     }
-    throw new Error("No " + BUNDLE_FILE + " (main or dev branch) or .mpp release found in " + info.repo + ".");
+    throw new InputError("No " + BUNDLE_FILE + " (main or dev branch) or .mpp release was found in " + info.repo + ".");
+  }
+
+  // ---------- source lists (Morphe Manager settings exports) ----------
+
+  // Add-source link for a bundle endpoint, only when Morphe would add that exact endpoint.
+  function addSourceFor(endpoint) {
+    const info = repoFromUrl(endpoint);
+    if (!info || (info.provider !== "github" && info.provider !== "gitlab")) return "";
+    if (info.path && (info.path !== BUNDLE_FILE || !BRANCHES.includes(info.branch))) return "";
+    return ADD_SOURCE + "?" + info.provider + "=" + info.repo;
+  }
+
+  // Returns [{ name, source }] for a settings export or a plain list of sources, else null.
+  function extractSources(data) {
+    if (!data || typeof data !== "object" || (!Array.isArray(data) && "download_url" in data)) return null;
+    const raw = Array.isArray(data) ? data
+      : (data.settings && data.settings.customBundles) || data.customBundles || data.bundles || null;
+    if (!Array.isArray(raw)) return null;
+    const items = raw.map((b) => {
+      const source = typeof b === "string" ? b : b && (b.source || b.url || b.endpoint);
+      return typeof source === "string" ? { name: (b && b.name) || "", source: source.trim() } : null;
+    });
+    if (!items.some(Boolean)) return null;
+    return { items, rawCount: raw.length };
+  }
+
+  function sourceChecks(data, found, out) {
+    const list = [["ok", "Valid JSON (" + fmtSize(out.bytes) + ", " + (out.from ? "fetched from " + hostOf(out.from) : "pasted") + ")"]];
+    const kind = data && data.settings ? "Morphe Manager settings export" : "List of patch sources";
+    const seen = new Set();
+    let bad = 0, dupes = 0;
+    const unique = [];
+    for (const it of found.items) {
+      if (!it || !/^https?:\/\//i.test(it.source)) { bad++; continue; }
+      const key = it.source.toLowerCase();
+      if (seen.has(key)) { dupes++; continue; }
+      seen.add(key);
+      unique.push(it);
+    }
+    list.push(["ok", kind + " with " + unique.length + " patch source" + (unique.length === 1 ? "" : "s")]);
+    if (bad) list.push(["warn", bad + " entr" + (bad === 1 ? "y has" : "ies have") + " no valid source link and " + (bad === 1 ? "was" : "were") + " skipped"]);
+    if (dupes) list.push(["info", dupes + " duplicate source" + (dupes === 1 ? "" : "s") + " hidden"]);
+    const linkable = unique.filter((it) => addSourceFor(it.source)).length;
+    list.push(["info", linkable + " of " + unique.length + " can be added to Morphe Android with a link" +
+      (linkable < unique.length ? ". The rest aren't on the main or dev branch, which Morphe's add-source links require." : "")]);
+    if (data && data.settings) {
+      list.push(["info", "Only the patch sources are used. The app settings in this file are ignored."]);
+      const secret = Object.entries(data.settings).find(([k, v]) => /(pat|token)$/i.test(k) && typeof v === "string" && v.trim());
+      if (secret) list.push(["warn", "This export contains a GitHub token (" + secret[0] + "). Don't share the file publicly."]);
+    }
+    return { checks: list, items: unique };
+  }
+
+  let listState = null;
+
+  function renderSources() {
+    const q = $("list-filter").value.trim().toLowerCase();
+    const shown = listState.items.filter((it) => !q || it.name.toLowerCase().includes(q) || it.source.toLowerCase().includes(q));
+    $("list-count").textContent = q ? shown.length + " / " + listState.items.length : String(listState.items.length);
+    $("sources").innerHTML = shown.map((it) => {
+      const idx = listState.items.indexOf(it);
+      const info = repoFromUrl(it.source);
+      const where = info ? HOSTS[info.provider] + "/" + info.repo : hostOf(it.source);
+      const link = addSourceFor(it.source);
+      return '<li data-idx="' + idx + '"' + (idx === listState.active ? ' class="active"' : "") + ">" +
+        '<div><div class="name">' + escapeHtml(it.name || (info ? info.repo.split("/").pop() : it.source)) + "</div>" +
+        '<div class="where">' + escapeHtml(where) + "</div></div>" +
+        '<div class="actions"><button type="button" data-pick="' + idx + '">Get .mpp</button>' +
+        (link ? '<a class="btn" href="' + escapeHtml(link) + '" target="_blank" rel="noopener">Open in Morphe</a>' : "") +
+        "</div></li>";
+    }).join("") || '<li class="where">No sources match.</li>';
+  }
+
+  function showList(items, listChecks) {
+    listState = { items, checks: listChecks, active: -1 };
+    $("list-filter").value = "";
+    renderSources();
+    $("list-card").classList.remove("hidden");
+  }
+
+  function hideList() {
+    listState = null;
+    $("list-card").classList.add("hidden");
+  }
+
+  async function pickSource(idx) {
+    const it = listState.items[idx];
+    listState.active = idx;
+    renderSources();
+    const id = ++runId;
+    setStatus("Fetching " + (it.name || it.source) + "…");
+    let out;
+    try {
+      out = await resolve(it.source);
+    } catch (e) {
+      if (id !== runId) return;
+      $("result").classList.add("hidden");
+      showChecks([["info", "Source: " + (it.name || it.source)], ...(e.checks || [])]);
+      setStatus(e.message || String(e), "err", e.openUrl);
+      return;
+    }
+    if (id !== runId) return;
+    await showBundle(out, it.source, id, [["info", "Source: " + (it.name || it.source)]]);
+    $("result").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  // ---------- validate ----------
+
+  function validate(bundle, out) {
+    const list = [];
+    if (out.direct) {
+      list.push(["info", "Direct .mpp link, no JSON to validate"]);
+    } else if (out.release) {
+      list.push(["info", "No " + BUNDLE_FILE + " found, so the latest GitHub release was used"]);
+    } else {
+      list.push(["ok", "Valid JSON (" + fmtSize(out.bytes) + ", " + (out.from ? "fetched from " + hostOf(out.from) : "pasted") + ")"]);
+    }
+
+    if (bundle === null || typeof bundle !== "object" || Array.isArray(bundle)) {
+      const got = Array.isArray(bundle) ? "an array" : bundle === null ? "null" : "a " + typeof bundle;
+      list.push(["err", "A patches-bundle.json is a JSON object { … }, but this is " + got]);
+      return { checks: list, fatal: true };
+    }
+
+    let fatal = false;
+    let name = "";
+    const dl = bundle.download_url;
+    if (dl === undefined) {
+      list.push(["err", "Missing download_url, the link to the .mpp file"]);
+      if (Array.isArray(bundle.patches)) {
+        list.push(["info", "This looks like patches-list.json (the list of patches). Use patches-bundle.json from the same repository."]);
+      }
+      fatal = true;
+    } else if (typeof dl !== "string") {
+      list.push(["err", "download_url must be a text link, not " + typeof dl]);
+      fatal = true;
+    } else {
+      let u = null;
+      try { u = new URL(dl); } catch {}
+      if (!u || !/^https?:$/.test(u.protocol)) {
+        list.push(["err", "download_url is not an http(s) link: " + dl]);
+        fatal = true;
+      } else {
+        name = fileName(dl);
+        list.push(/\.mpp$/i.test(u.pathname)
+          ? ["ok", "download_url points to " + name]
+          : ["warn", "download_url doesn't end in .mpp (" + name + "). Morphe may not accept it."]);
+      }
+    }
+
+    const version = bundle.version;
+    if (version === undefined || version === "") {
+      list.push(["warn", "No version field"]);
+    } else if (typeof version !== "string" && typeof version !== "number") {
+      list.push(["warn", "version should be text, like \"1.2.3\""]);
+    } else {
+      const fromName = name && versionFromName(name);
+      const strip = (v) => String(v).replace(/^v/i, "");
+      list.push(fromName && strip(fromName) !== strip(version)
+        ? ["warn", "version \"" + version + "\" doesn't match the file name (" + fromName + ")"]
+        : ["ok", "version " + version]);
+    }
+
+    if (bundle.created_at !== undefined && bundle.created_at !== "") {
+      const d = new Date(bundle.created_at);
+      list.push(isNaN(d) ? ["warn", "created_at isn't a valid date: " + bundle.created_at] : ["ok", "created_at " + d.toLocaleString()]);
+    }
+
+    const sig = bundle.signature_download_url;
+    if (sig) {
+      list.push(typeof sig === "string" && /^https?:\/\//i.test(sig)
+        ? ["ok", "Signature file listed"]
+        : ["warn", "signature_download_url isn't an http(s) link"]);
+    }
+
+    const key = bundle.public_key;
+    if (key) {
+      let ok = false;
+      try { ok = typeof key === "string" && atob(key).length > 0; } catch {}
+      list.push(ok ? ["ok", "public_key is valid base64 (" + atob(key).length + " bytes)"] : ["warn", "public_key isn't valid base64"]);
+    }
+
+    if (bundle.description !== undefined && typeof bundle.description !== "string") {
+      list.push(["warn", "description should be text (Markdown)"]);
+    }
+
+    const extra = Object.keys(bundle).filter((k) => !KNOWN_FIELDS.includes(k));
+    if (extra.length) list.push(["info", "Other fields: " + extra.join(", ")]);
+
+    return { checks: list, fatal };
+  }
+
+  // Confirms the .mpp exists. Returns a check line.
+  async function verifyMpp(href) {
+    const u = new URL(href);
+    const seg = u.pathname.split("/").filter(Boolean).map(decodeURIComponent);
+    if (u.hostname === "github.com" && seg[2] === "releases" && seg[3] === "download" && seg.length === 6) {
+      const repo = seg[0] + "/" + seg[1];
+      const tag = seg[4];
+      const name = seg[5];
+      let res;
+      try {
+        res = await fetch("https://api.github.com/repos/" + repo + "/releases/tags/" + encodeURIComponent(tag));
+      } catch {
+        return ["info", "Couldn't reach GitHub to check that the .mpp exists"];
+      }
+      if (res.status === 404) return ["err", "Release " + tag + " doesn't exist in " + repo + " (or it's private), so the download will fail"];
+      if (!res.ok) return ["info", "Couldn't check that the .mpp exists right now (GitHub API " + res.status + ")"];
+      const rel = await res.json();
+      const asset = (rel.assets || []).find((a) => a.name === name);
+      return asset
+        ? ["ok", name + " exists in release " + tag + " (" + fmtSize(asset.size) + ")"]
+        : ["err", name + " is not attached to release " + tag + ", so the download will fail"];
+    }
+    try {
+      const res = await fetch(href, { method: "HEAD" });
+      if (!res.ok) return ["err", "The .mpp link answered with HTTP " + res.status];
+      const len = +res.headers.get("content-length");
+      return ["ok", "The .mpp is reachable" + (len ? " (" + fmtSize(len) + ")" : "")];
+    } catch {
+      return ["info", hostOf(href) + " doesn't allow checking the .mpp from a browser. The download link should still work."];
+    }
   }
 
   // ---------- render ----------
@@ -524,15 +962,7 @@
   }
 
   function render({ bundle, source }, raw) {
-    if (!bundle || typeof bundle !== "object" || Array.isArray(bundle)) {
-      throw new Error("Expected a JSON object like patches-bundle.json.");
-    }
     const dl = bundle.download_url;
-    if (!dl || typeof dl !== "string") throw new Error("This JSON has no download_url, so there is no .mpp to point to.");
-    let dlUrl;
-    try { dlUrl = new URL(dl); } catch { throw new Error("download_url is not a valid URL: " + dl); }
-    if (!/^https?:$/.test(dlUrl.protocol)) throw new Error("download_url must be an http(s) link.");
-
     // Repo can also come from the .mpp's release URL.
     const repo = source || repoFromUrl(dl);
     const name = fileName(dl);
@@ -541,25 +971,28 @@
     $("r-title").textContent = repo ? repo.repo.split("/").pop() : name.replace(/\.mpp$/i, "");
     const meta = [];
     if (version) meta.push('<span class="badge">v' + escapeHtml(String(version).replace(/^v/, "")) + "</span>");
-    if (repo) meta.push('<span class="badge plain">' + escapeHtml((repo.provider === "gitlab" ? "gitlab.com/" : "github.com/") + repo.repo) + "</span>");
+    if (repo) meta.push('<span class="badge plain">' + escapeHtml(HOSTS[repo.provider] + "/" + repo.repo) + "</span>");
     if (bundle.created_at) {
       const d = new Date(bundle.created_at);
       if (!isNaN(d)) meta.push('<span class="badge plain">' + escapeHtml(d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })) + "</span>");
     }
     $("r-meta").innerHTML = meta.join("");
 
-    $("r-download").href = dlUrl.href;
+    $("r-download").href = dl;
     $("r-download").setAttribute("download", name);
     $("r-filename").textContent = name;
-    $("r-mpp-url").value = dlUrl.href;
+    $("r-mpp-url").value = dl;
 
     const sig = bundle.signature_download_url;
-    $("r-sig").classList.toggle("hidden", !sig);
-    if (sig) $("r-sig").href = sig;
+    const sigOk = typeof sig === "string" && /^https?:\/\//i.test(sig);
+    $("r-sig").classList.toggle("hidden", !sigOk);
+    if (sigOk) $("r-sig").href = sig;
 
     // Morphe's add-source link names only the repository; the app then reads
-    // patches-bundle.json at the repo root on main/dev.
-    const addSource = repo ? ADD_SOURCE + "?" + repo.provider + "=" + repo.repo : "";
+    // patches-bundle.json at the repo root on main/dev. Morphe supports GitHub and GitLab.
+    const addSource = repo && (repo.provider === "github" || repo.provider === "gitlab")
+      ? ADD_SOURCE + "?" + repo.provider + "=" + repo.repo
+      : "";
     $("android-link-block").classList.toggle("hidden", !addSource);
     $("android-file-block").classList.toggle("hidden", !!addSource);
     $("desktop-link-block").classList.toggle("hidden", !addSource);
@@ -592,20 +1025,56 @@
     const raw = input.value;
     if (!raw.trim()) {
       $("result").classList.add("hidden");
+      hideList();
+      showChecks(null);
       setStatus("");
       return;
     }
-    setStatus("Converting…");
+    setStatus(/^\s*[{[]/.test(raw) ? "Checking…" : "Fetching…");
+    let out;
     try {
-      const out = await resolve(raw);
-      if (id !== runId) return;
-      render(out, raw);
-      setStatus("✓ Ready", "ok");
+      out = await resolve(raw);
     } catch (e) {
       if (id !== runId) return;
       $("result").classList.add("hidden");
-      setStatus(e.message || String(e), "err");
+      hideList();
+      showChecks(e.checks);
+      setStatus(e.message || String(e), "err", e.openUrl);
+      return;
     }
+    if (id !== runId) return;
+
+    const found = extractSources(out.bundle);
+    if (found) {
+      const { checks: listChecks, items } = sourceChecks(out.bundle, found, out);
+      $("result").classList.add("hidden");
+      showList(items, listChecks);
+      showChecks(listChecks);
+      setStatus(items.length ? items.length + " patch sources found. Pick one below." : "No usable patch sources in this file.", items.length ? "ok" : "err");
+      return;
+    }
+    hideList();
+    await showBundle(out, raw, id, []);
+  }
+
+  async function showBundle(out, raw, id, prefix) {
+    const v = validate(out.bundle, out);
+    v.checks = [...prefix, ...v.checks];
+    if (v.fatal) {
+      $("result").classList.add("hidden");
+      showChecks(v.checks);
+      setStatus("This JSON isn't a usable patch bundle. See the checks below.", "err");
+      return;
+    }
+    render(out, raw);
+    const warned = v.checks.some(([k]) => k === "warn");
+    showChecks([...v.checks, ["pending", "Checking that the .mpp exists…"]]);
+    setStatus(warned ? "Ready, with warnings. See the checks below." : "✓ Ready", warned ? "warn" : "ok");
+
+    const mpp = await verifyMpp(out.bundle.download_url);
+    if (id !== runId) return;
+    showChecks([...v.checks, mpp]);
+    if (mpp[0] === "err") setStatus("Converted, but the .mpp link looks broken. See the checks below.", "err");
   }
 
   // ---------- wiring ----------
@@ -636,6 +1105,11 @@
     const f = e.target.files[0];
     if (f) setInput(await f.text());
     e.target.value = "";
+  });
+  $("list-filter").addEventListener("input", () => listState && renderSources());
+  $("sources").addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-pick]");
+    if (btn && listState) pickSource(+btn.dataset.pick);
   });
   document.querySelectorAll("[data-example]").forEach((b) =>
     b.addEventListener("click", () => setInput(b.dataset.example)));
