@@ -320,10 +320,18 @@
       <div class="note hidden" id="multi-note"></div>
 
       <h3>📦 Or merge them into one .mpp</h3>
-      <p class="sub" style="margin:0 0 8px">Websites can't fetch <code>.mpp</code> files from GitHub or GitLab, so this happens in two steps: download the selected files, then drop them into <a href="#merge-card">Merge .mpp files</a> below.</p>
+      <p class="sub" style="margin:0 0 8px">Get the selected download links, copy them or download files individually, then drop the files into <a href="#merge-card">Merge .mpp files</a> below. Getting links does not start any downloads.</p>
       <div class="row">
-        <button type="button" class="btn primary" id="dl-selected">⬇ Download selected .mpp files</button>
-        <span class="status" id="dl-status"></span>
+        <button type="button" class="btn primary" id="dl-selected">🔗 Get selected .mpp links</button>
+        <span class="status" id="dl-status" role="status"></span>
+      </div>
+      <div class="hidden" id="dl-output">
+        <div class="row space mt">
+          <label for="dl-text">Download links and filenames</label>
+          <button type="button" data-copy-from="dl-text">Copy all</button>
+        </div>
+        <textarea id="dl-text" rows="8" readonly spellcheck="false" aria-label="Selected repository URLs, MPP filenames and download links"></textarea>
+        <p class="sub">Suggested filenames use <code>author-repo-version-XX.mpp</code>, where XX is the JSON version. Cross-site downloads may keep the server's filename; use the name shown here when saving.</p>
       </div>
       <ol class="dl-links hidden" id="dl-links"></ol>
     </div>
@@ -576,6 +584,23 @@
     return m ? m[1] : "";
   }
 
+  // Keep repository ownership in the filename, using the JSON version first.
+  function mppDetails({ bundle, source, from }) {
+    const url = bundle.download_url;
+    const repo = source || (from && repoFromUrl(from)) || repoFromUrl(url);
+    const original = fileName(url);
+    const version = typeof bundle.version === "string" || typeof bundle.version === "number"
+      ? String(bundle.version).trim() : "";
+    const safe = (part) => part.replace(/[^a-z0-9._-]+/gi, "-").replace(/^[.-]+|[.-]+$/g, "") || "unknown";
+    return {
+      url,
+      repository: repo ? "https://" + HOSTS[repo.provider] + "/" + repo.repo : "",
+      filename: repo
+        ? repo.repo.split("/").map(safe).join("-") + "-version-" + safe(version || versionFromName(original) || "unknown") + ".mpp"
+        : original,
+    };
+  }
+
   // Splits "<branch>/<path>" segments, allowing GitHub's "refs/heads/<branch>/<path>" form.
   function branchAndPath(seg) {
     if (seg[0] === "refs" && (seg[1] === "heads" || seg[1] === "tags") && seg.length >= 4) {
@@ -803,6 +828,17 @@
   }
 
   let listState = null;
+  let linksRunId = 0;
+
+  function clearDownloadLinks() {
+    ++linksRunId;
+    $("dl-selected").disabled = false;
+    $("dl-status").textContent = "";
+    $("dl-text").value = "";
+    $("dl-output").classList.add("hidden");
+    $("dl-links").innerHTML = "";
+    $("dl-links").classList.add("hidden");
+  }
 
   function renderSources() {
     const q = $("list-filter").value.trim().toLowerCase();
@@ -839,6 +875,11 @@
 
   function renderSelection() {
     const sel = [...listState.selected].sort((a, b) => a - b);
+    const key = sel.join(",");
+    if (listState.selectionKey !== key) {
+      listState.selectionKey = key;
+      clearDownloadLinks();
+    }
     $("sel-count").textContent = sel.length ? sel.length + " selected" : "None selected";
     $("multi").classList.toggle("hidden", !sel.length);
     if (!sel.length) return;
@@ -872,6 +913,7 @@
   }
 
   function hideList() {
+    clearDownloadLinks();
     listState = null;
     $("list-card").classList.add("hidden");
   }
@@ -897,10 +939,13 @@
     $("result").scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  // Resolves the selected sources to .mpp links and starts the downloads.
-  async function downloadSelected() {
+  // Resolve metadata only; never start downloads for a batch of sources.
+  async function getSelectedLinks() {
     const sel = [...listState.selected].sort((a, b) => a - b).map((i) => listState.items[i]);
     if (!sel.length) return;
+    clearDownloadLinks();
+    const id = linksRunId;
+    $("dl-selected").disabled = true;
     const st = $("dl-status");
     const results = new Array(sel.length);
     const failed = [];
@@ -908,43 +953,37 @@
     st.className = "status";
     st.textContent = "Finding files 0/" + sel.length + "…";
     await Promise.all(Array.from({ length: Math.min(4, sel.length) }, async () => {
-      while (next < sel.length) {
-        const it = sel[next++];
+      while (next < sel.length && id === linksRunId) {
+        const index = next++;
+        const it = sel[index];
         try {
           const out = await resolve(it.source);
+          if (id !== linksRunId) return;
           const dl = out && out.bundle && out.bundle.download_url;
           if (typeof dl !== "string" || !/^https?:\/\//i.test(dl)) throw new Error("no download_url");
-          results[sel.indexOf(it)] = { name: it.name || fileName(dl), url: dl };
+          results[index] = mppDetails({ ...out, source: out.source || repoFromUrl(it.source) });
         } catch {
+          if (id !== linksRunId) return;
           failed.push(it.name || it.source);
         }
         st.textContent = "Finding files " + ++done + "/" + sel.length + "…";
       }
     }));
 
+    if (id !== linksRunId) return;
+    $("dl-selected").disabled = false;
+
     const found = results.filter(Boolean);
     $("dl-links").innerHTML = found.map((r) =>
-      '<li><a href="' + escapeHtml(r.url) + '" download rel="noopener">' + escapeHtml(r.name) + "</a> · " + escapeHtml(fileName(r.url)) + "</li>").join("");
+      '<li><a href="' + escapeHtml(r.url) + '" download="' + escapeHtml(r.filename) + '" target="_blank" rel="noopener">' + escapeHtml(r.repository || r.url) + "</a> · " + escapeHtml(r.filename) + "</li>").join("");
     $("dl-links").classList.toggle("hidden", !found.length);
-
-    // GitHub and GitLab send .mpp files as attachments, so clicking downloads without leaving the page.
-    const auto = found.filter((r) => /^(github\.com|gitlab\.com)$/.test(hostOf(r.url)));
-    for (const r of auto) {
-      const a = document.createElement("a");
-      a.href = r.url;
-      a.download = fileName(r.url);
-      a.rel = "noopener";
-      document.body.append(a);
-      a.click();
-      a.remove();
-      await new Promise((ok) => setTimeout(ok, 400));
-    }
+    $("dl-text").value = found.map((r) =>
+      (r.repository ? r.repository + "\n" : "") + r.filename + "\n" + r.url).join("\n\n");
+    $("dl-output").classList.toggle("hidden", !found.length);
 
     const parts = [];
-    if (auto.length) parts.push("Started " + auto.length + " download" + (auto.length === 1 ? "" : "s") + ". If your browser blocked some, allow multiple downloads or use the links below.");
-    if (found.length > auto.length) parts.push((found.length - auto.length) + " from other hosts are only listed below.");
+    parts.push("Found " + found.length + " link" + (found.length === 1 ? "" : "s") + ". No downloads started.");
     if (failed.length) parts.push("Couldn't find a .mpp for: " + failed.join(", ") + ".");
-    parts.push("Then drop the files into Merge .mpp files.");
     st.className = "status" + (failed.length ? " warn" : " ok");
     st.textContent = parts.join(" ");
   }
@@ -1327,7 +1366,7 @@
     const dl = bundle.download_url;
     // Repo can also come from the .mpp's release URL.
     const repo = source || repoFromUrl(dl);
-    const name = fileName(dl);
+    const name = mppDetails({ bundle, source }).filename;
     const version = bundle.version || versionFromName(name);
 
     $("r-title").textContent = repo ? repo.repo.split("/").pop() : name.replace(/\.mpp$/i, "");
@@ -1485,7 +1524,7 @@
     shownIndexes().forEach((i) => listState.selected.add(i));
     renderSources();
   });
-  $("dl-selected").addEventListener("click", () => listState && downloadSelected());
+  $("dl-selected").addEventListener("click", () => listState && getSelectedLinks());
 
   const mergeDrop = $("merge-drop");
   mergeDrop.addEventListener("click", () => $("merge-file").click());
