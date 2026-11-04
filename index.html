@@ -170,6 +170,7 @@
     padding: 2px 10px;
     font-size: .82rem;
     font-weight: 600;
+    white-space: nowrap;
   }
   .badge.plain { background: var(--surface-2); color: var(--muted); }
 
@@ -234,7 +235,13 @@
   }
   .sources li:first-child { border-top: 0; }
   .sources li.active { background: var(--accent-soft); border-radius: 8px; }
+  .sources .main { display: flex; gap: 10px; align-items: flex-start; min-width: 0; }
+  .sources input[type="checkbox"] { width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--accent); flex: none; cursor: pointer; }
   .sources .name { font-weight: 600; overflow-wrap: anywhere; }
+  .select-bar { margin-top: 10px; font-size: .88rem; color: var(--muted); }
+  .select-bar button { padding: 5px 10px; font-size: .84rem; }
+  .multi { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+  .multi textarea { min-height: 84px; font-size: 12.5px; }
   .sources .where { color: var(--muted); font-size: .82rem; overflow-wrap: anywhere; }
   .sources .actions { display: flex; gap: 6px; flex: none; }
   .sources .actions .btn, .sources .actions button { padding: 5px 10px; font-size: .84rem; }
@@ -276,9 +283,25 @@
 
   <section class="card hidden" id="list-card">
     <h2>Patch sources <span class="badge" id="list-count"></span></h2>
-    <p class="sub">From a Morphe Manager settings export. Pick a source to get its <code>.mpp</code> and links.</p>
+    <p class="sub">From a Morphe Manager settings export. Pick a source to get its <code>.mpp</code> and links, or tick several to build one Morphe Desktop command.</p>
     <input type="search" class="search" id="list-filter" placeholder="Filter by name or repository…" aria-label="Filter sources">
+    <div class="row space select-bar">
+      <span id="sel-count">None selected</span>
+      <div class="row">
+        <button type="button" id="sel-shown">Select shown</button>
+        <button type="button" id="sel-clear">Clear selection</button>
+      </div>
+    </div>
     <ul class="sources" id="sources"></ul>
+    <div class="multi hidden" id="multi">
+      <div class="row space">
+        <h2 style="margin:0">🖥 Morphe Desktop command <span class="badge" id="multi-count"></span></h2>
+        <button type="button" data-copy-from="multi-cmd">Copy</button>
+      </div>
+      <p class="sub" style="margin:6px 0 8px">Patches one app with all the selected sources in a single run. Desktop downloads each source's latest <code>.mpp</code> itself. Replace <code>your_app.apk</code> with your APK.</p>
+      <textarea id="multi-cmd" readonly spellcheck="false" aria-label="Morphe Desktop command for the selected sources"></textarea>
+      <div class="note hidden" id="multi-note"></div>
+    </div>
   </section>
 
   <section class="card hidden" id="checks-card">
@@ -746,17 +769,59 @@
       const info = repoFromUrl(it.source);
       const where = info ? HOSTS[info.provider] + "/" + info.repo : hostOf(it.source);
       const link = addSourceFor(it.source);
+      const label = it.name || (info ? info.repo.split("/").pop() : it.source);
       return '<li data-idx="' + idx + '"' + (idx === listState.active ? ' class="active"' : "") + ">" +
-        '<div><div class="name">' + escapeHtml(it.name || (info ? info.repo.split("/").pop() : it.source)) + "</div>" +
-        '<div class="where">' + escapeHtml(where) + "</div></div>" +
+        '<div class="main"><input type="checkbox" data-sel="' + idx + '"' + (listState.selected.has(idx) ? " checked" : "") +
+        ' aria-label="Select ' + escapeHtml(label) + '">' +
+        '<div><div class="name">' + escapeHtml(label) + "</div>" +
+        '<div class="where">' + escapeHtml(where) + "</div></div></div>" +
         '<div class="actions"><button type="button" data-pick="' + idx + '">Get .mpp</button>' +
         (link ? '<a class="btn" href="' + escapeHtml(link) + '" target="_blank" rel="noopener">Open in Morphe</a>' : "") +
         "</div></li>";
     }).join("") || '<li class="where">No sources match.</li>';
+    renderSelection();
+  }
+
+  function shownIndexes() {
+    return [...$("sources").querySelectorAll("[data-sel]")].map((el) => +el.dataset.sel);
+  }
+
+  // Repository URL in the form Morphe Desktop's -p accepts (it doesn't take raw bundle links).
+  function desktopRepoUrl(source) {
+    const info = repoFromUrl(source);
+    if (!info || (info.provider !== "github" && info.provider !== "gitlab")) return "";
+    return "https://" + HOSTS[info.provider] + "/" + info.repo;
+  }
+
+  function renderSelection() {
+    const sel = [...listState.selected].sort((a, b) => a - b);
+    $("sel-count").textContent = sel.length ? sel.length + " selected" : "None selected";
+    $("multi").classList.toggle("hidden", !sel.length);
+    if (!sel.length) return;
+
+    const urls = [], skipped = [];
+    for (const idx of sel) {
+      const it = listState.items[idx];
+      const url = desktopRepoUrl(it.source);
+      if (!url) skipped.push(it.name || it.source);
+      else if (!urls.includes(url)) urls.push(url);
+    }
+    const cmd = urls.length
+      ? "java -jar morphe-desktop-*-all.jar patch " + urls.map((u) => "-p " + u).join(" ") + " your_app.apk"
+      : "";
+    $("multi-cmd").value = cmd;
+    $("multi-count").textContent = urls.length + " source" + (urls.length === 1 ? "" : "s");
+
+    const notes = [];
+    if (skipped.length) notes.push("Left out, because Morphe Desktop only takes GitHub or GitLab repositories: " + skipped.join(", ") + ".");
+    if (cmd.length > 8000) notes.push("This command is " + cmd.length.toLocaleString() + " characters, more than Windows allows on one command line (about 8,000). Select fewer sources.");
+    if (urls.length > 10) notes.push("Many bundles patch the same apps in different ways. Selecting only the sources meant for your app avoids conflicting patches.");
+    $("multi-note").textContent = notes.join(" ");
+    $("multi-note").classList.toggle("hidden", !notes.length);
   }
 
   function showList(items, listChecks) {
-    listState = { items, checks: listChecks, active: -1 };
+    listState = { items, checks: listChecks, active: -1, selected: new Set() };
     $("list-filter").value = "";
     renderSources();
     $("list-card").classList.remove("hidden");
@@ -1110,6 +1175,23 @@
   $("sources").addEventListener("click", (e) => {
     const btn = e.target.closest("[data-pick]");
     if (btn && listState) pickSource(+btn.dataset.pick);
+  });
+  $("sources").addEventListener("change", (e) => {
+    const box = e.target.closest("[data-sel]");
+    if (!box || !listState) return;
+    if (box.checked) listState.selected.add(+box.dataset.sel);
+    else listState.selected.delete(+box.dataset.sel);
+    renderSelection();
+  });
+  $("sel-shown").addEventListener("click", () => {
+    if (!listState) return;
+    shownIndexes().forEach((i) => listState.selected.add(i));
+    renderSources();
+  });
+  $("sel-clear").addEventListener("click", () => {
+    if (!listState) return;
+    listState.selected.clear();
+    renderSources();
   });
   document.querySelectorAll("[data-example]").forEach((b) =>
     b.addEventListener("click", () => setInput(b.dataset.example)));

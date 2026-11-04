@@ -68,6 +68,16 @@ A Morphe Manager settings export holds your list of patch sources (`settings.cus
 - **Get .mpp**: fetch that source's `patches-bundle.json` and show its download, links and checks below the list.
 - **Open in Morphe**: add it to Morphe Android straight away (only for sources on the `main` or `dev` branch, which is what add-source links support).
 
+#### Several sources in one Morphe Desktop run
+
+Sources can't be merged into a single `.mpp`. Each bundle is compiled code with its own `classes.dex`, manifest and required patcher version, and many sources are forks of the same patches. Morphe Desktop can load several bundles in one run instead, so the list lets you **tick sources** (or **Select shown** after filtering) and builds one command:
+
+```bash
+java -jar morphe-desktop-*-all.jar patch -p https://github.com/owner/one -p https://gitlab.com/owner/two your_app.apk
+```
+
+Desktop downloads each source's latest `.mpp` itself, so this also works for sources whose bundle isn't on `main`/`dev`. The page warns when the command gets too long for Windows (about 8,000 characters). Pick only the sources meant for the app you're patching, since bundles for the same app can conflict.
+
 Duplicates and entries without a valid link are skipped and counted in the checks. A plain JSON array of source URLs, or of `{ "name", "source" }` objects, works the same way.
 
 Only the source list is used: the app settings in the file are ignored. Exports can contain your keystore password and, if you enabled it, a GitHub token, so **don't post your own export publicly**. The page warns you when it sees a token, and never puts a pasted export into a share link.
