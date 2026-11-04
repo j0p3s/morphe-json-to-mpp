@@ -14,7 +14,6 @@
 <meta name="twitter:card" content="summary">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Cpath d='M9 16h11m-4-5 5 5-5 5' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
   :root {
     --bg: #f6f7fb;
@@ -154,6 +153,8 @@
   .copy-action.jdownloader { background: #0f766e; border-color: #0f766e; }
   .copy-action:hover { filter: brightness(1.12); border-color: currentColor; }
   .copy-action:focus-visible { outline: 3px solid var(--text); outline-offset: 3px; }
+  .config-option { display: flex; gap: 10px; align-items: flex-start; margin-top: 12px; }
+  .config-option input { flex: none; margin-top: 5px; }
   .chip { padding: 4px 10px; font-size: .82rem; font-weight: 500; border-radius: 999px; }
 
   .status { font-size: .9rem; color: var(--muted); min-height: 1.4em; overflow-wrap: anywhere; }
@@ -264,20 +265,6 @@
   .multi textarea { min-height: 84px; font-size: 12.5px; }
   .multi h3 { font-size: .98rem; margin: 18px 0 4px; }
   .dl-links { margin: 8px 0 0; padding-left: 20px; font-size: .86rem; max-height: 160px; overflow-y: auto; overflow-wrap: anywhere; }
-  .dropzone {
-    border: 2px dashed var(--border);
-    border-radius: 12px;
-    padding: 22px 16px;
-    text-align: center;
-    color: var(--muted);
-    cursor: pointer;
-  }
-  .dropzone.dragging { border-color: var(--accent); background: var(--accent-soft); }
-  .dropzone b { color: var(--text); }
-  .bundles { list-style: none; margin: 12px 0 0; padding: 0; font-size: .9rem; }
-  .bundles li { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-top: 1px solid var(--border); overflow-wrap: anywhere; }
-  .bundles li:first-child { border-top: 0; }
-  .bundles .v { color: var(--muted); flex: none; }
   .sources .where { color: var(--muted); font-size: .82rem; overflow-wrap: anywhere; }
   .sources .actions { display: flex; gap: 6px; flex: none; }
   .sources .actions .btn, .sources .actions button { padding: 5px 10px; font-size: .84rem; }
@@ -319,7 +306,7 @@
 
   <section class="card hidden" id="list-card">
     <h2>Patch sources <span class="badge" id="list-count"></span></h2>
-    <p class="sub">From a Morphe Manager settings export. Pick a source to get its <code>.mpp</code> and links, or tick several to build one Morphe Desktop command.</p>
+    <p class="sub">From the input JSON. Pick a source to get its <code>.mpp</code> and links, tick several to build one Morphe Desktop command, or <a href="#config-card">create a Desktop config.json</a> below.</p>
     <input type="search" class="search" id="list-filter" placeholder="Filter by name or repository…" aria-label="Filter sources">
     <div class="row space select-bar">
       <span id="sel-count">None selected</span>
@@ -338,8 +325,8 @@
       <textarea id="multi-cmd" readonly spellcheck="false" aria-label="Morphe Desktop command for the selected sources"></textarea>
       <div class="note hidden" id="multi-note"></div>
 
-      <h3>📦 Or merge them into one .mpp</h3>
-      <p class="sub" style="margin:0 0 8px">Get the selected download links, copy them or download files individually, then drop the files into <a href="#merge-card">Merge .mpp files</a> below. Getting links does not start any downloads.</p>
+      <h3>🔗 Download links for selected sources</h3>
+      <p class="sub" style="margin:0 0 8px">Get the selected download links, copy them or download files individually. Getting links does not start any downloads.</p>
       <div class="row">
         <button type="button" class="btn primary" id="dl-selected">🔗 Get selected .mpp links</button>
         <span class="status" id="dl-status" role="status"></span>
@@ -439,19 +426,23 @@
     </section>
   </div>
 
-  <section class="card" id="merge-card">
-    <h2>📦 Merge .mpp files</h2>
-    <p class="sub">Combine several patch bundles into a single <code>.mpp</code>. It only works when the bundles don't contain the same files; the checks tell you if they do. Everything happens in your browser.</p>
-    <div class="dropzone" id="merge-drop" tabindex="0" role="button" aria-label="Choose .mpp files to merge">
-      <b>Drop .mpp files here</b> or click to choose
+  <section class="card" id="config-card">
+    <h2>⚙ Morphe Desktop config.json</h2>
+    <p class="sub">Create a ready-to-use Desktop configuration from the patch sources in the JSON or link entered above. The official Morphe source is included once. All supported sources are included by default.</p>
+    <label class="config-option"><input type="checkbox" id="config-selected"> Use only the sources ticked in the list above</label>
+    <label class="config-option"><input type="checkbox" id="config-prerelease" checked> Include pre-release patches</label>
+    <p class="status mt" id="config-status" role="status">Enter a source list or patch bundle above to create a config.</p>
+    <a class="btn primary copy-action hidden" id="config-download" download="config.json">⬇ Download config.json</a>
+    <details class="mt hidden" id="config-preview-wrap">
+      <summary>Preview config.json</summary>
+      <textarea id="config-preview" rows="14" readonly spellcheck="false" aria-label="Generated Morphe Desktop config.json"></textarea>
+    </details>
+    <div class="note">
+      <b>Where to put the file</b>
+      <p>Close Morphe Desktop and back up your existing <code>config.json</code>. Move the downloaded file into the <code>morphe-data</code> folder beside your Morphe Desktop JAR, replacing <code>config.json</code>, then reopen Morphe.</p>
+      <p>If your installation uses the Morphe folder in your Windows user directory, open <code>%USERPROFILE%\morphe</code> in File Explorer and put the file there instead. If you chose a custom data folder, use the folder containing your current <code>config.json</code>.</p>
+      <p>This starter config replaces your Desktop settings. It contains no signing keys, saved passwords or GitHub token; reconfigure signing if needed.</p>
     </div>
-    <input type="file" id="merge-file" accept=".mpp" multiple class="hidden">
-    <ul class="bundles hidden" id="merge-list"></ul>
-    <div class="row mt hidden" id="merge-actions">
-      <a class="btn primary hidden" id="merge-download" href="#">⬇ Download merged .mpp</a>
-      <button type="button" id="merge-clear">Clear</button>
-    </div>
-    <ul class="checks hidden" id="merge-checks"></ul>
   </section>
 
   <footer>
@@ -486,6 +477,72 @@
       this.openUrl = extra.openUrl || null;
     }
   }
+
+  const DESKTOP_CONFIG_TEMPLATE = {
+  "language": "system",
+  "themePreference": "SYSTEM",
+  "backgroundType": "CIRCLES",
+  "enableParallax": true,
+  "customAccentColorArgb": null,
+  "lastCliVersion": null,
+  "lastPatchesVersion": null,
+  "lastPatchesVersionBySource": {},
+  "sourceVersionPrefs": {},
+  "sourceChannelFlagsSeeded": true,
+  "cardFills": {},
+  "globalCardFill": null,
+  "useSharpCorners": false,
+  "groupPatchesByCategory": true,
+  "homeAppSortMode": "RECOMMENDED",
+  "preferredPatchChannel": "STABLE",
+  "useSimplifiedMode": false,
+  "patchSource": [
+    {
+      "id": "morphe-default",
+      "name": "Morphe Patches",
+      "type": "DEFAULT",
+      "url": "https://github.com/MorpheApp/morphe-patches",
+      "filePath": null,
+      "deletable": false,
+      "enabled": true,
+      "usePreRelease": true
+    }
+  ],
+  "activePatchSourceId": "morphe-default",
+  "collapsibleSectionStates": {
+    "Strip libs": true,
+    "Runtime logs": true,
+    "GitHub PAT": true,
+    "Signing": false
+  },
+  "dismissedUpdateVersion": null,
+  "updateChannelPreference": "DEV",
+  "userDidChooseUpdateChannel": true,
+  "multiSourceHintDismissed": false,
+  "homeAppListFilter": "ALL",
+  "keystorePath": null,
+  "keystorePassword": null,
+  "keystoreAlias": "Morphe",
+  "keystoreEntryPassword": null,
+  "defaultOutputDirectory": null,
+  "keepArchitectures": [
+    "arm64-v8a",
+    "armeabi-v7a",
+    "x86",
+    "x86_64"
+  ],
+  "gitHubPat": "",
+  "autoStartAdb": true,
+  "autoRouteLinksAfterInstall": true,
+  "disableStockLinksAfterInstall": false,
+  "autoCleanupTempFiles": true,
+  "developerOptions": true,
+  "excludedMppPatterns": [],
+  "lastLocalPatchDir": null,
+  "themeStyle": "MORPHE",
+  "useSimpleMode": false,
+  "preferredPatchSourceByPackage": {}
+};
 
   // ---------- helpers ----------
 
@@ -815,13 +872,13 @@
   function extractSources(data) {
     if (!data || typeof data !== "object" || (!Array.isArray(data) && "download_url" in data)) return null;
     const raw = Array.isArray(data) ? data
-      : (data.settings && data.settings.customBundles) || data.customBundles || data.bundles || null;
+      : (data.settings && data.settings.customBundles) || data.customBundles || data.bundles || data.patchSource || null;
     if (!Array.isArray(raw)) return null;
     const items = raw.map((b) => {
       const source = typeof b === "string" ? b : b && (b.source || b.url || b.endpoint);
       return typeof source === "string" ? { name: (b && b.name) || "", source: source.trim() } : null;
     });
-    if (!items.some(Boolean)) return null;
+    if (raw.length && !items.some(Boolean)) return null;
     return { items, rawCount: raw.length };
   }
 
@@ -899,6 +956,80 @@
     return "https://" + HOSTS[info.provider] + "/" + info.repo;
   }
 
+  // Build the Desktop schema, keeping the official source and deduplicating repositories.
+  function createDesktopConfig(items, includePreRelease = true) {
+    const config = JSON.parse(JSON.stringify(DESKTOP_CONFIG_TEMPLATE));
+    const official = { ...config.patchSource[0], usePreRelease: includePreRelease };
+    const sources = [official];
+    const seen = new Set([official.url.toLowerCase()]);
+    const skipped = [];
+    let supported = 0;
+    for (const item of items) {
+      let url, info;
+      try {
+        url = desktopRepoUrl(item.source);
+        info = url && repoFromUrl(url);
+      } catch { /* Invalid URL: report it alongside unsupported sources. */ }
+      if (!info) { skipped.push(item.name || item.source); continue; }
+      supported++;
+      if (seen.has(url.toLowerCase())) continue;
+      seen.add(url.toLowerCase());
+      sources.push({
+        id: info.provider + "-" + encodeURIComponent(info.repo.toLowerCase()),
+        name: item.name || info.repo,
+        type: info.provider === "github" ? "GITHUB" : "GITLAB",
+        url, filePath: null, deletable: true, enabled: true,
+        usePreRelease: includePreRelease,
+      });
+    }
+    config.patchSource = sources;
+    config.activePatchSourceId = official.id;
+    config.sourceVersionPrefs = Object.fromEntries(sources.map((source) => [source.id, {
+      mode: includePreRelease ? "FOLLOW_DEV" : "FOLLOW_STABLE", pinnedTag: null,
+    }]));
+    config.sourceChannelFlagsSeeded = true;
+    return { config, skipped, supported };
+  }
+
+  let configItems = [];
+  let configUrl = null;
+
+  function renderDesktopConfig() {
+    if (configUrl) { URL.revokeObjectURL(configUrl); configUrl = null; }
+    const download = $("config-download");
+    download.classList.add("hidden");
+    download.href = "";
+    $("config-preview-wrap").classList.add("hidden");
+    $("config-preview").value = "";
+    const selectedOnly = $("config-selected").checked;
+    const items = selectedOnly
+      ? (listState ? [...listState.selected].sort((a, b) => a - b).map((i) => listState.items[i]) : [])
+      : configItems;
+    const status = $("config-status");
+    status.className = "status mt";
+    if (!items.length) {
+      status.textContent = selectedOnly ? "Tick at least one source in the list above, or turn off selected-only mode."
+        : "Enter a source list or patch bundle above to create a config.";
+      return;
+    }
+    const { config, skipped, supported } = createDesktopConfig(items, $("config-prerelease").checked);
+    if (!supported) {
+      status.textContent = "None of these sources can be added to Desktop. Use GitHub or GitLab repository sources.";
+      status.className += " warn";
+      return;
+    }
+    const text = JSON.stringify(config, null, 4) + "\n";
+    configUrl = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+    download.href = configUrl;
+    download.classList.remove("hidden");
+    $("config-preview").value = text;
+    $("config-preview-wrap").classList.remove("hidden");
+    status.textContent = "Ready: " + config.patchSource.length + " source" + (config.patchSource.length === 1 ? "" : "s") + ", including the official Morphe source. " +
+      (selectedOnly ? "Using ticked sources." : "Using all sources from the input.") +
+      (skipped.length ? " Skipped " + skipped.length + " unsupported source(s): " + skipped.join(", ") + "." : "");
+    status.className += skipped.length ? " warn" : " ok";
+  }
+
   function renderSelection() {
     const sel = [...listState.selected].sort((a, b) => a - b);
     const key = sel.join(",");
@@ -908,6 +1039,7 @@
     }
     $("sel-count").textContent = sel.length ? sel.length + " selected" : "None selected";
     $("multi").classList.toggle("hidden", !sel.length);
+    renderDesktopConfig();
     if (!sel.length) return;
 
     const urls = [], skipped = [];
@@ -932,6 +1064,7 @@
   }
 
   function showList(items, listChecks) {
+    configItems = items;
     listState = { items, checks: listChecks, active: -1, selected: new Set() };
     $("list-filter").value = "";
     renderSources();
@@ -941,6 +1074,8 @@
   function hideList() {
     clearDownloadLinks();
     listState = null;
+    configItems = [];
+    renderDesktopConfig();
     $("list-card").classList.add("hidden");
   }
 
@@ -1013,207 +1148,6 @@
     if (failed.length) parts.push("Couldn't find a .mpp for: " + failed.join(", ") + ".");
     st.className = "status" + (failed.length ? " warn" : " ok");
     st.textContent = parts.join(" ");
-  }
-
-  // ---------- merge .mpp files ----------
-
-  function parseManifest(text) {
-    const out = {};
-    let key = null;
-    for (const line of text.replace(/\r/g, "").split("\n")) {
-      if (line.startsWith(" ") && key) { out[key] += line.slice(1); continue; }
-      const i = line.indexOf(": ");
-      if (i > 0) { key = line.slice(0, i); out[key] = line.slice(i + 2); } else key = null;
-    }
-    return out;
-  }
-
-  // One manifest attribute, wrapped at 72 bytes as the JAR spec requires.
-  function manifestLine(key, value) {
-    const enc = new TextEncoder();
-    let rest = key + ": " + String(value).replace(/[\r\n]+/g, " ");
-    let out = "", limit = 72;
-    while (enc.encode(rest).length > limit) {
-      let n = Math.min(rest.length, limit);
-      while (enc.encode(rest.slice(0, n)).length > limit) n--;
-      if (/[\uD800-\uDBFF]/.test(rest[n - 1])) n--;
-      out += rest.slice(0, n) + "\r\n ";
-      rest = rest.slice(n);
-      limit = 71;
-    }
-    return out + rest + "\r\n";
-  }
-
-  function compareVersions(a, b) {
-    const pa = a.split(/[.-]/).map((x) => parseInt(x, 10) || 0);
-    const pb = b.split(/[.-]/).map((x) => parseInt(x, 10) || 0);
-    for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-      if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) - (pb[i] || 0);
-    }
-    return 0;
-  }
-
-  function sameBytes(a, b) {
-    if (a.length !== b.length) return false;
-    for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
-    return true;
-  }
-
-  async function readBundle(file) {
-    let zip;
-    try { zip = await JSZip.loadAsync(file); } catch { return { error: file.name + " isn't a valid .mpp (it's not a zip file)" }; }
-    const mf = zip.file("META-INF/MANIFEST.MF");
-    const paths = Object.keys(zip.files);
-    if (!mf || !paths.some((p) => /^classes\d*\.dex$/.test(p) || p.endsWith(".class"))) {
-      return { error: file.name + " isn't a Morphe patch bundle (no manifest or patch code)" };
-    }
-    const manifest = parseManifest(await mf.async("string"));
-    return { file, zip, manifest, label: manifest.Name || file.name };
-  }
-
-  // Merges bundles into one zip. Refuses when two bundles carry different files at the same path,
-  // because a patch would then load another bundle's class or extension.
-  async function mergeBundles(bundles) {
-    const list = [];
-    const pv = bundles.map((b) => b.manifest["Patcher-Version"]).filter(Boolean);
-    const majors = new Set(pv.map((v) => v.split(".")[0]));
-    if (majors.size > 1) {
-      list.push(["err", "These bundles need different Morphe patcher versions (" + [...new Set(pv)].join(", ") + "). A merged file can only declare one."]);
-    }
-
-    const files = [];          // [path, zipEntry]
-    const owner = new Map();   // path → { i, entry }
-    const conflicts = new Map(); // "i|j" → [paths]
-    let dexCount = 0, shared = 0, classCount = 0;
-    for (const [i, b] of bundles.entries()) {
-      const entries = Object.values(b.zip.files).filter((e) => !e.dir);
-      const dex = entries.filter((e) => /^classes\d*\.dex$/.test(e.name))
-        .sort((x, y) => (parseInt(x.name.slice(7), 10) || 1) - (parseInt(y.name.slice(7), 10) || 1));
-      for (const e of dex) files.push(["classes" + (dexCount++ ? dexCount : "") + ".dex", e]);
-
-      for (const e of entries) {
-        const path = e.name;
-        if (/^classes\d*\.dex$/.test(path) || path === "META-INF/MANIFEST.MF" || /^META-INF\/[^/]+\.(SF|RSA|DSA|EC)$/i.test(path)) continue;
-        if (/^META-INF\/[^/]+\.kotlin_module$/.test(path)) {
-          files.push([path.replace(/\.kotlin_module$/, "-" + (i + 1) + ".kotlin_module"), e]);
-          continue;
-        }
-        if (path.endsWith(".class")) classCount++;
-        const prev = owner.get(path);
-        if (!prev) {
-          owner.set(path, { i, entry: e });
-          files.push([path, e]);
-          continue;
-        }
-        // Classes also live in each bundle's DEX, so even identical copies would be duplicate classes.
-        const same = !path.endsWith(".class") && sameBytes(await prev.entry.async("uint8array"), await e.async("uint8array"));
-        if (same) { shared++; continue; }
-        const key = prev.i + "|" + i;
-        if (!conflicts.has(key)) conflicts.set(key, []);
-        conflicts.get(key).push(path);
-      }
-    }
-
-    if (conflicts.size) {
-      const total = [...conflicts.values()].reduce((n, p) => n + p.length, 0);
-      list.push(["err", total + " file" + (total === 1 ? "" : "s") + " clash between bundles, so they can't be merged safely. Morphe would load one bundle's code or extension for another's patches."]);
-      let shown = 0;
-      for (const [key, paths] of conflicts) {
-        if (shown++ >= 8) {
-          list.push(["info", "…and " + (conflicts.size - 8) + " more clashing pairs"]);
-          break;
-        }
-        const [a, b] = key.split("|").map(Number);
-        const ext = paths.find((p) => p.startsWith("extensions/"));
-        const sample = ext || paths[0];
-        list.push(["err", "\"" + bundles[a].label + "\" and \"" + bundles[b].label + "\" both contain " + sample +
-          (paths.length > 1 ? " and " + (paths.length - 1) + " other file" + (paths.length > 2 ? "s" : "") : "")]);
-      }
-      list.push(["info", "Bundles built from the same template or fork usually clash. Use the Morphe Desktop command to load them side by side instead."]);
-    }
-    if (list.some(([k]) => k === "err")) return { checks: list, fatal: true };
-
-    const labels = bundles.map((b) => b.label);
-    const name = labels.length <= 3 ? labels.join(" + ") : labels.slice(0, 2).join(" + ") + " + " + (labels.length - 2) + " more";
-    const uniq = (key) => [...new Set(bundles.map((b) => b.manifest[key]).filter((v) => v && v !== "na"))].join(", ");
-    const maxPv = pv.slice().sort(compareVersions).pop();
-    const d = new Date();
-    let manifest = manifestLine("Manifest-Version", "1.0") +
-      manifestLine("Name", "Merged: " + name) +
-      manifestLine("Description", "Merged from " + bundles.map((b) => b.label + (b.manifest.Version ? " " + b.manifest.Version : "")).join(", ")) +
-      manifestLine("Version", d.getFullYear() + "." + (d.getMonth() + 1) + "." + d.getDate()) +
-      manifestLine("Timestamp", Date.now()) +
-      manifestLine("Source", "https://github.com/j0p3s/morphe-json-to-mpp") +
-      manifestLine("Author", uniq("Author") || "na") +
-      manifestLine("Contact", "na") +
-      manifestLine("Website", "https://j0p3s.github.io/morphe-json-to-mpp/") +
-      manifestLine("License", uniq("License") || "na");
-    if (maxPv) manifest += manifestLine("Patcher-Version", maxPv);
-    manifest += "\r\n";
-
-    const out = new JSZip();
-    out.file("META-INF/MANIFEST.MF", manifest);
-    for (const [path, e] of files) out.file(path, await e.async("uint8array"));
-    const blob = await out.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } });
-
-    list.push(["ok", bundles.length + " bundles merged with no clashing files (" + dexCount + " DEX file" + (dexCount === 1 ? "" : "s") + ", " + classCount + " classes)"]);
-    if (shared) list.push(["info", shared + " identical file" + (shared === 1 ? "" : "s") + " shared by several bundles kept once"]);
-    list.push(maxPv
-      ? ["ok", "Patcher-Version " + maxPv + (new Set(pv).size > 1 ? " (the newest of " + [...new Set(pv)].join(", ") + ")" : "")]
-      : ["warn", "None of the bundles declare a Patcher-Version"]);
-    if (pv.length < bundles.length && pv.length) list.push(["info", (bundles.length - pv.length) + " bundle(s) don't declare a Patcher-Version"]);
-    list.push(["warn", "The merged file is unsigned and won't auto-update. Only merge bundles you trust, and merge again for new versions."]);
-    return { checks: list, fatal: false, blob };
-  }
-
-  let mergeItems = [];
-  let mergeUrl = null;
-  let mergeRun = 0;
-
-  async function addMergeFiles(fileList) {
-    for (const f of fileList) {
-      if (!mergeItems.some((m) => m.file.name === f.name && m.file.size === f.size)) mergeItems.push(await readBundle(f).then((b) => ({ file: f, ...b })));
-    }
-    runMerge();
-  }
-
-  async function runMerge() {
-    const id = ++mergeRun;
-    if (mergeUrl) { URL.revokeObjectURL(mergeUrl); mergeUrl = null; }
-    const has = mergeItems.length > 0;
-    $("merge-list").classList.toggle("hidden", !has);
-    $("merge-actions").classList.toggle("hidden", !has);
-    $("merge-download").classList.add("hidden");
-    $("merge-list").innerHTML = mergeItems.map((m) =>
-      "<li><span>" + escapeHtml(m.error ? m.file.name : m.label) + "</span><span class=\"v\">" +
-      escapeHtml(m.error ? "invalid" : (m.manifest.Version ? "v" + m.manifest.Version + " · " : "") + fmtSize(m.file.size)) + "</span></li>").join("");
-
-    let list;
-    const bad = mergeItems.filter((m) => m.error);
-    const good = mergeItems.filter((m) => !m.error);
-    if (!has) list = [];
-    else if (typeof JSZip !== "function") list = [["err", "The zip library didn't load, so merging isn't available. Check your connection and reload."]];
-    else if (bad.length) list = bad.map((m) => ["err", m.error]);
-    else if (good.length < 2) list = [["info", "Add at least one more .mpp to merge"]];
-    else {
-      $("merge-checks").innerHTML = checksHtml([["pending", "Merging " + good.length + " bundles…"]]);
-      $("merge-checks").classList.remove("hidden");
-      const res = await mergeBundles(good);
-      if (id !== mergeRun) return;
-      list = res.checks;
-      if (!res.fatal) {
-        mergeUrl = URL.createObjectURL(res.blob);
-        const fname = "merged-patches-" + good.length + "-bundles.mpp";
-        const a = $("merge-download");
-        a.href = mergeUrl;
-        a.download = fname;
-        a.textContent = "⬇ Download " + fname + " (" + fmtSize(res.blob.size) + ")";
-        a.classList.remove("hidden");
-      }
-    }
-    if (id !== mergeRun) return;
-    $("merge-checks").innerHTML = checksHtml(list);
-    $("merge-checks").classList.toggle("hidden", !list.length);
   }
 
   // ---------- validate ----------
@@ -1451,6 +1385,8 @@
   async function convert() {
     const id = ++runId;
     const raw = input.value;
+    // Clear the previous input's download while the new input is resolving.
+    hideList();
     if (!raw.trim()) {
       $("result").classList.add("hidden");
       hideList();
@@ -1495,6 +1431,11 @@
       return;
     }
     render(out, raw);
+    if (!listState) {
+      const repo = out.source || (out.from && repoFromUrl(out.from)) || repoFromUrl(out.bundle.download_url);
+      configItems = repo ? [{ name: repo.repo, source: "https://" + HOSTS[repo.provider] + "/" + repo.repo }] : [];
+      renderDesktopConfig();
+    }
     const warned = v.checks.some(([k]) => k === "warn");
     showChecks([...v.checks, ["pending", "Checking that the .mpp exists…"]]);
     setStatus(warned ? "Ready, with warnings. See the checks below." : "✓ Ready", warned ? "warn" : "ok");
@@ -1510,6 +1451,9 @@
   let timer;
   input.addEventListener("input", () => {
     clearTimeout(timer);
+    ++runId;
+    hideList();
+    $("result").classList.add("hidden");
     timer = setTimeout(convert, 450);
   });
 
@@ -1553,28 +1497,8 @@
   });
   $("dl-selected").addEventListener("click", () => listState && getSelectedLinks());
 
-  const mergeDrop = $("merge-drop");
-  mergeDrop.addEventListener("click", () => $("merge-file").click());
-  mergeDrop.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("merge-file").click(); }
-  });
-  $("merge-file").addEventListener("change", (e) => {
-    addMergeFiles([...e.target.files]);
-    e.target.value = "";
-  });
-  ["dragenter", "dragover"].forEach((t) => mergeDrop.addEventListener(t, (e) => {
-    e.preventDefault();
-    mergeDrop.classList.add("dragging");
-  }));
-  ["dragleave", "drop"].forEach((t) => mergeDrop.addEventListener(t, () => mergeDrop.classList.remove("dragging")));
-  mergeDrop.addEventListener("drop", (e) => {
-    e.preventDefault();
-    addMergeFiles([...e.dataTransfer.files]);
-  });
-  $("merge-clear").addEventListener("click", () => {
-    mergeItems = [];
-    runMerge();
-  });
+  $("config-selected").addEventListener("change", renderDesktopConfig);
+  $("config-prerelease").addEventListener("change", renderDesktopConfig);
 
   $("sel-clear").addEventListener("click", () => {
     if (!listState) return;

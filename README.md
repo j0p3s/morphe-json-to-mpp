@@ -7,6 +7,7 @@ A single web page that turns a Morphe `patches-bundle.json` — or a link to one
 - a direct **download of the `.mpp` patch bundle**,
 - an **add-source link for Morphe Android** (Morphe Manager), with a QR code for scanning from a computer,
 - a **source link and CLI command for Morphe Desktop**,
+- a downloadable **Morphe Desktop `config.json`** populated with the input's patch sources,
 - a **share link** that reproduces the same conversion for someone else,
 - **checks** that the JSON is valid, the bundle's fields make sense, and the `.mpp` really exists.
 
@@ -68,7 +69,7 @@ A Morphe Manager settings export holds your list of patch sources (`settings.cus
 - **Get .mpp**: fetch that source's `patches-bundle.json` and show its download, links and checks below the list.
 - **Open in Morphe**: add it to Morphe Android straight away (only for sources on the `main` or `dev` branch, which is what add-source links support).
 
-#### Merge several sources into one `.mpp`
+#### Download links for several sources
 
 Tick sources in the list and press **Get selected .mpp links**. This fetches the sources' metadata without downloading any `.mpp` files. The first text box contains only direct `.mpp` download URLs, separated by commas; **Copy all** copies these plain URLs. Repository URLs and suggested filenames are shown beside the individual download links below the boxes. Changing the selection clears the old links.
 
@@ -76,18 +77,19 @@ For JDownloader, use **Copy for JDownloader** and paste into **Add New Links**. 
 
 Suggested filenames use `author-repo-version-XX.mpp`, with XX taken from the JSON's `version`: for example, `author-repo-version-1.2.3.mpp`. The same naming applies to individual conversions. When the JSON has no version, the version in the original filename is used, or `unknown` if neither is available. Without a repository, the original filename is kept. Cross-site downloads may ignore the suggested filename and keep the server's name; rename the saved file to the name shown in the list if needed.
 
-Drop the downloaded files into **Merge .mpp files**. The page builds one `.mpp` in your browser: each bundle's `classes.dex` becomes `classes.dex`, `classes2.dex`, …, every other file is kept as-is, and a new manifest is written with the newest `Patcher-Version`.
+#### Generate Morphe Desktop config.json
 
-It refuses to merge when it isn't safe:
+The **Morphe Desktop config.json** section uses all supported patch sources from the JSON or link in the first input field. It also works with a single patch bundle whose GitHub/GitLab repository can be identified, or a Desktop config's `patchSource` list. Tick **Use only the sources ticked in the list above** to limit the config to your selection. Filtering alone does not change which sources are included.
 
-- **Clashing files:** two bundles contain a different file at the same path, such as a class or `extensions/extension.mpe`. Morphe would load one bundle's code for another's patches. Forks of the same patches almost always clash.
-- **Different patcher versions:** for example, one bundle needs 1.x and another 2.x.
+The downloaded file follows Morphe Desktop's config schema. It keeps the official `morphe-default` source once, deduplicates repositories, creates enabled `GITHUB`/`GITLAB` entries with unique IDs, and reports sources Desktop cannot use. **Include pre-release patches** starts enabled, matching the reference config; turn it off to follow stable releases. Source version preferences are generated to match that choice. A preview shows the exact file before downloading.
 
-The merged file is unsigned and won't auto-update. (Websites can't download `.mpp` files from GitHub or GitLab directly, which is why downloading is a separate step.)
+Click **Download config.json**, close Morphe Desktop, and back up your current config. Replace `config.json` in `morphe-data` beside the application JAR. Installations using the Windows user-home fallback should put it in `%USERPROFILE%\morphe` instead. For custom storage, use the folder containing the current config (the `MORPHE_DATA_DIR` setting takes precedence). Reopen Morphe Desktop. These locations follow [Morphe Desktop's storage-path resolver](https://github.com/MorpheApp/morphe-desktop/blob/main/src/main/kotlin/app/morphe/engine/MorpheData.kt).
+
+This is a starter config based on the supplied schema, not an edit of the visitor's installed settings. Signing paths, passwords and the GitHub token are blank; reconfigure signing if needed. No MPP files are merged or fetched to generate the config.
 
 #### Several sources in one Morphe Desktop run
 
-When bundles clash, Morphe Desktop can still load them side by side. The list lets you **tick sources** (or **Select shown** after filtering) and builds one command:
+Morphe Desktop can load several sources side by side. The list lets you **tick sources** (or **Select shown** after filtering) and builds one command:
 
 ```bash
 java -jar morphe-desktop-*-all.jar patch -p https://github.com/owner/one -p https://gitlab.com/owner/two your_app.apk
