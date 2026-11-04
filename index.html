@@ -135,6 +135,25 @@
   button:hover, .btn:hover { border-color: var(--accent); }
   .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
   .btn.primary:hover { filter: brightness(1.08); }
+  .copy-heading { display: grid; gap: 8px; margin-top: 20px; margin-bottom: 8px; }
+  .copy-heading label { font-weight: 700; }
+  .copy-action {
+    width: 100%;
+    min-height: 52px;
+    justify-content: center;
+    padding: 12px 16px;
+    background: #4f46e5;
+    border: 2px solid #4f46e5;
+    color: #ffffff;
+    font-size: 1rem;
+    font-weight: 750;
+    white-space: normal;
+    text-align: center;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, .18);
+  }
+  .copy-action.jdownloader { background: #0f766e; border-color: #0f766e; }
+  .copy-action:hover { filter: brightness(1.12); border-color: currentColor; }
+  .copy-action:focus-visible { outline: 3px solid var(--text); outline-offset: 3px; }
   .chip { padding: 4px 10px; font-size: .82rem; font-weight: 500; border-radius: 999px; }
 
   .status { font-size: .9rem; color: var(--muted); min-height: 1.4em; overflow-wrap: anywhere; }
@@ -326,14 +345,14 @@
         <span class="status" id="dl-status" role="status"></span>
       </div>
       <div class="hidden" id="dl-output">
-        <div class="row space mt">
+        <div class="copy-heading">
           <label for="dl-text">Direct .mpp links (comma-separated)</label>
-          <button type="button" data-copy-from="dl-text">Copy all</button>
+          <button type="button" class="copy-action" data-copy-from="dl-text">📋 Copy all .mpp links</button>
         </div>
         <textarea id="dl-text" rows="4" readonly spellcheck="false" aria-label="Direct MPP download URLs separated by commas"></textarea>
-        <div class="row space mt">
+        <div class="copy-heading">
           <label for="dl-jd-text">JDownloader direct download links</label>
-          <button type="button" data-copy-from="dl-jd-text">Copy for JDownloader</button>
+          <button type="button" class="copy-action jdownloader" data-copy-from="dl-jd-text">📋 Copy for JDownloader</button>
         </div>
         <textarea id="dl-jd-text" rows="4" readonly spellcheck="false" aria-label="JDownloader direct download links, one per line"></textarea>
         <p class="sub">For JDownloader, use <b>Copy for JDownloader</b> and paste into <b>Add New Links</b>. These links use <code>directhttp://</code> to treat each URL as a file instead of scanning a web page.</p>
