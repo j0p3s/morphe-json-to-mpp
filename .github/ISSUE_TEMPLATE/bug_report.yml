@@ -1,0 +1,33 @@
+name: Bug report
+description: Something doesn't convert, or a link or check is wrong.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! **Don't paste a settings export that contains a GitHub token or other secrets.**
+  - type: textarea
+    id: input
+    attributes:
+      label: What did you paste?
+      description: The link, `owner/repo`, or the JSON (remove anything private).
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect, and what happened?
+    validations:
+      required: true
+  - type: textarea
+    id: message
+    attributes:
+      label: Error message or checks
+      description: Copy the text under the input box and the Checks panel, if any.
+      render: text
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and device
+      placeholder: Chrome 140 on Android, Firefox on Windows…

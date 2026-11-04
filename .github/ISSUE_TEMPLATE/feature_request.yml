@@ -1,0 +1,16 @@
+name: Feature request
+description: A new input format, host, link type or improvement.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like?
+    validations:
+      required: true
+  - type: textarea
+    id: example
+    attributes:
+      label: Example
+      description: A sample link or JSON file that shows the case, if there is one.
+      render: text

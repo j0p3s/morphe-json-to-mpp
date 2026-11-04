@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Problems with Morphe itself or a patch
+    url: https://github.com/MorpheApp
+    about: This page only converts links. Report patching or app issues to Morphe or to the patch source's own repository.
