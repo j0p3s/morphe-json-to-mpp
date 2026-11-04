@@ -68,9 +68,20 @@ A Morphe Manager settings export holds your list of patch sources (`settings.cus
 - **Get .mpp**: fetch that source's `patches-bundle.json` and show its download, links and checks below the list.
 - **Open in Morphe**: add it to Morphe Android straight away (only for sources on the `main` or `dev` branch, which is what add-source links support).
 
+#### Merge several sources into one `.mpp`
+
+Tick sources in the list, press **Download selected .mpp files**, then drop the downloaded files into **Merge .mpp files**. The page builds one `.mpp` in your browser: each bundle's `classes.dex` becomes `classes.dex`, `classes2.dex`, …, every other file is kept as-is, and a new manifest is written with the newest `Patcher-Version`.
+
+It refuses to merge when it isn't safe:
+
+- **Clashing files:** two bundles contain a different file at the same path, such as a class or `extensions/extension.mpe`. Morphe would load one bundle's code for another's patches. Forks of the same patches almost always clash.
+- **Different patcher versions:** for example, one bundle needs 1.x and another 2.x.
+
+The merged file is unsigned and won't auto-update. (Websites can't download `.mpp` files from GitHub or GitLab directly, which is why downloading is a separate step.)
+
 #### Several sources in one Morphe Desktop run
 
-Sources can't be merged into a single `.mpp`. Each bundle is compiled code with its own `classes.dex`, manifest and required patcher version, and many sources are forks of the same patches. Morphe Desktop can load several bundles in one run instead, so the list lets you **tick sources** (or **Select shown** after filtering) and builds one command:
+When bundles clash, Morphe Desktop can still load them side by side. The list lets you **tick sources** (or **Select shown** after filtering) and builds one command:
 
 ```bash
 java -jar morphe-desktop-*-all.jar patch -p https://github.com/owner/one -p https://gitlab.com/owner/two your_app.apk
