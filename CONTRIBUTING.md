@@ -32,6 +32,8 @@ If a source doesn't convert, first check that the repository actually has a `pat
 
 ## Guidelines
 
+Run `node --test tests/links.test.cjs` to check link generation, filenames, partial failures and selection changes while requests are pending. These tests require Node.js and no additional packages.
+
 - Keep it a single, dependency-light static file with no build step.
 - Don't add analytics, trackers or a backend. Input should only go to the hosts needed to resolve it.
 - Match the links Morphe itself generates. If Morphe changes its add-source format, update the page and the README together.

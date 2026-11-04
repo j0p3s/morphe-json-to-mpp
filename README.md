@@ -70,7 +70,11 @@ A Morphe Manager settings export holds your list of patch sources (`settings.cus
 
 #### Merge several sources into one `.mpp`
 
-Tick sources in the list, press **Download selected .mpp files**, then drop the downloaded files into **Merge .mpp files**. The page builds one `.mpp` in your browser: each bundle's `classes.dex` becomes `classes.dex`, `classes2.dex`, …, every other file is kept as-is, and a new manifest is written with the newest `Patcher-Version`.
+Tick sources in the list and press **Get selected .mpp links**. This fetches the sources' metadata without downloading any `.mpp` files. A text box lists each repository URL (for example, `https://github.com/author/repo`), suggested filename and direct download URL. Use **Copy all** to copy the list, or download individual files from the links below it. Changing the selection clears the old links.
+
+Suggested filenames use `author-repo-version-XX.mpp`, with XX taken from the JSON's `version`: for example, `author-repo-version-1.2.3.mpp`. The same naming applies to individual conversions. When the JSON has no version, the version in the original filename is used, or `unknown` if neither is available. Without a repository, the original filename is kept. Cross-site downloads may ignore the suggested filename and keep the server's name; rename the saved file to the name shown in the list if needed.
+
+Drop the downloaded files into **Merge .mpp files**. The page builds one `.mpp` in your browser: each bundle's `classes.dex` becomes `classes.dex`, `classes2.dex`, …, every other file is kept as-is, and a new manifest is written with the newest `Patcher-Version`.
 
 It refuses to merge when it isn't safe:
 
