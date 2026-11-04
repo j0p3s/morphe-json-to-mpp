@@ -61,6 +61,10 @@ test('batch only resolves metadata, preserves order, and lists partial failures'
     'https://github.com/alice/one/releases/download/v1.2.3/patches-1.2.3.mpp',
     'https://github.com/bob/two/releases/download/v1.2.3/patches-1.2.3.mpp',
   ].join(','));
+  assert.equal(el('dl-jd-text').value, [
+    'directhttp://https://github.com/alice/one/releases/download/v1.2.3/patches-1.2.3.mpp',
+    'directhttp://https://github.com/bob/two/releases/download/v1.2.3/patches-1.2.3.mpp',
+  ].join('\n'));
   assert.match(el('dl-links').innerHTML, /download="alice-one-version-1.2.3.mpp"/);
   assert.match(el('dl-status').textContent, /No downloads started/);
   assert.match(el('dl-status').textContent, /Couldn't find a .mpp for: https:\/\/github.com\/bob\/bad/);
@@ -76,6 +80,7 @@ test('clearing a selection prevents old requests from displaying stale results',
   finish(bundle('alice/one'));
   await pending;
   assert.equal(el('dl-text').value, '');
+  assert.equal(el('dl-jd-text').value, '');
   assert.equal(el('dl-links').innerHTML, '');
   assert.equal(el('dl-status').textContent, '');
   assert.equal(el('dl-selected').disabled, false);
@@ -86,6 +91,7 @@ test('failed or invalid download URLs do not produce stale links', async () => {
   api.select([{ source: 'https://github.com/alice/one' }]);
   await api.getSelectedLinks();
   assert.equal(el('dl-text').value, '');
+  assert.equal(el('dl-jd-text').value, '');
   assert.equal(el('dl-links').innerHTML, '');
   assert.match(el('dl-status').textContent, /Found 0 links/);
 });

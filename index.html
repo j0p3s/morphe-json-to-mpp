@@ -327,10 +327,16 @@
       </div>
       <div class="hidden" id="dl-output">
         <div class="row space mt">
-          <label for="dl-text">Direct .mpp links for JDownloader (comma-separated)</label>
+          <label for="dl-text">Direct .mpp links (comma-separated)</label>
           <button type="button" data-copy-from="dl-text">Copy all</button>
         </div>
-        <textarea id="dl-text" rows="8" readonly spellcheck="false" aria-label="Direct MPP download URLs separated by commas"></textarea>
+        <textarea id="dl-text" rows="4" readonly spellcheck="false" aria-label="Direct MPP download URLs separated by commas"></textarea>
+        <div class="row space mt">
+          <label for="dl-jd-text">JDownloader direct download links</label>
+          <button type="button" data-copy-from="dl-jd-text">Copy for JDownloader</button>
+        </div>
+        <textarea id="dl-jd-text" rows="4" readonly spellcheck="false" aria-label="JDownloader direct download links, one per line"></textarea>
+        <p class="sub">For JDownloader, use <b>Copy for JDownloader</b> and paste into <b>Add New Links</b>. These links use <code>directhttp://</code> to treat each URL as a file instead of scanning a web page.</p>
         <p class="sub">Suggested filenames use <code>author-repo-version-XX.mpp</code>, where XX is the JSON version. Cross-site downloads may keep the server's filename; use the name shown here when saving.</p>
       </div>
       <ol class="dl-links hidden" id="dl-links"></ol>
@@ -835,6 +841,7 @@
     $("dl-selected").disabled = false;
     $("dl-status").textContent = "";
     $("dl-text").value = "";
+    $("dl-jd-text").value = "";
     $("dl-output").classList.add("hidden");
     $("dl-links").innerHTML = "";
     $("dl-links").classList.add("hidden");
@@ -978,6 +985,8 @@
       '<li><a href="' + escapeHtml(r.url) + '" download="' + escapeHtml(r.filename) + '" target="_blank" rel="noopener">' + escapeHtml(r.repository || r.url) + "</a> · " + escapeHtml(r.filename) + "</li>").join("");
     $("dl-links").classList.toggle("hidden", !found.length);
     $("dl-text").value = found.map((r) => r.url).join(",");
+    // Newlines delimit DirectHTTP links; a comma can be part of a URL.
+    $("dl-jd-text").value = found.map((r) => "directhttp://" + r.url).join("\n");
     $("dl-output").classList.toggle("hidden", !found.length);
 
     const parts = [];

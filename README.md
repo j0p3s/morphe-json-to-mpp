@@ -70,7 +70,9 @@ A Morphe Manager settings export holds your list of patch sources (`settings.cus
 
 #### Merge several sources into one `.mpp`
 
-Tick sources in the list and press **Get selected .mpp links**. This fetches the sources' metadata without downloading any `.mpp` files. The text box contains only direct `.mpp` download URLs, separated by commas for pasting into JDownloader. Use **Copy all** to copy these URLs. Repository URLs and suggested filenames are shown beside the individual download links below the box. Changing the selection clears the old links.
+Tick sources in the list and press **Get selected .mpp links**. This fetches the sources' metadata without downloading any `.mpp` files. The first text box contains only direct `.mpp` download URLs, separated by commas; **Copy all** copies these plain URLs. Repository URLs and suggested filenames are shown beside the individual download links below the boxes. Changing the selection clears the old links.
+
+For JDownloader, use **Copy for JDownloader** and paste into **Add New Links**. The second text box prefixes each download URL with `directhttp://` and puts one link per line. This tells JDownloader to handle the URL as a file, including uncommon extensions such as `.mpp`, instead of crawling pages. Do not copy repository URLs into LinkGrabber: they can cause it to collect GitHub scripts and images. This format is specific to JDownloader; use the plain URLs in a browser. Broken or removed release assets will still be unavailable.
 
 Suggested filenames use `author-repo-version-XX.mpp`, with XX taken from the JSON's `version`: for example, `author-repo-version-1.2.3.mpp`. The same naming applies to individual conversions. When the JSON has no version, the version in the original filename is used, or `unknown` if neither is available. Without a repository, the original filename is kept. Cross-site downloads may ignore the suggested filename and keep the server's name; rename the saved file to the name shown in the list if needed.
 
