@@ -1,0 +1,691 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Morphe JSON to MPP</title>
+<meta name="description" content="Turn a Morphe patches-bundle.json (or a link to one) into a downloadable .mpp patch bundle and add-source links for Morphe Desktop and Morphe Android.">
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<style>
+  :root {
+    --bg: #f6f7fb;
+    --surface: #ffffff;
+    --surface-2: #f0f2f8;
+    --border: #dfe3ee;
+    --text: #151826;
+    --muted: #5d6478;
+    --accent: #4f46e5;
+    --accent-text: #ffffff;
+    --accent-soft: #eceafe;
+    --ok: #12805c;
+    --err: #c0362c;
+    --err-soft: #fdecea;
+    --code: #eef0f6;
+    --shadow: 0 1px 2px rgba(20, 24, 40, .06), 0 4px 16px rgba(20, 24, 40, .05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0e1017;
+      --surface: #161924;
+      --surface-2: #1d2130;
+      --border: #2a2f41;
+      --text: #e8eaf2;
+      --muted: #9aa1b6;
+      --accent: #8b85ff;
+      --accent-text: #0e1017;
+      --accent-soft: #24234a;
+      --ok: #4cc79a;
+      --err: #ff8a80;
+      --err-soft: #3a1d1d;
+      --code: #222738;
+      --shadow: none;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e1017;
+    --surface: #161924;
+    --surface-2: #1d2130;
+    --border: #2a2f41;
+    --text: #e8eaf2;
+    --muted: #9aa1b6;
+    --accent: #8b85ff;
+    --accent-text: #0e1017;
+    --accent-soft: #24234a;
+    --ok: #4cc79a;
+    --err: #ff8a80;
+    --err-soft: #3a1d1d;
+    --code: #222738;
+    --shadow: none;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  a { color: var(--accent); }
+  code, .mono { font-family: ui-monospace, "JetBrains Mono", Consolas, monospace; font-size: .9em; }
+  code { background: var(--code); padding: .1em .35em; border-radius: 4px; }
+
+  .wrap { max-width: 860px; margin: 0 auto; padding: 32px 16px 64px; }
+  header h1 { font-size: 1.6rem; margin: 0 0 4px; letter-spacing: -.01em; }
+  header p { margin: 0 0 24px; color: var(--muted); }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    box-shadow: var(--shadow);
+    margin-bottom: 16px;
+  }
+  .card h2 { font-size: 1.05rem; margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
+  .card .sub { color: var(--muted); margin: 0 0 14px; font-size: .92rem; }
+
+  textarea {
+    width: 100%;
+    min-height: 120px;
+    resize: vertical;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface-2);
+    color: var(--text);
+    padding: 12px;
+    font: 13px/1.5 ui-monospace, "JetBrains Mono", Consolas, monospace;
+  }
+  textarea:focus, input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .drop.dragging textarea { border-color: var(--accent); background: var(--accent-soft); }
+
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .row.space { justify-content: space-between; }
+  .mt { margin-top: 12px; }
+
+  button, .btn {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+    border-radius: 9px;
+    padding: 8px 14px;
+    font: inherit;
+    font-size: .92rem;
+    font-weight: 550;
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  button:hover, .btn:hover { border-color: var(--accent); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .chip { padding: 4px 10px; font-size: .82rem; font-weight: 500; border-radius: 999px; }
+
+  .status { font-size: .9rem; color: var(--muted); min-height: 1.4em; }
+  .status.err { color: var(--err); }
+  .status.ok { color: var(--ok); }
+
+  .meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+  .badge {
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-radius: 999px;
+    padding: 2px 10px;
+    font-size: .82rem;
+    font-weight: 600;
+  }
+  .badge.plain { background: var(--surface-2); color: var(--muted); }
+
+  .field {
+    display: flex;
+    gap: 6px;
+    align-items: stretch;
+    margin-top: 8px;
+  }
+  .field input {
+    flex: 1;
+    min-width: 0;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--surface-2);
+    color: var(--text);
+    padding: 8px 10px;
+    font: 12.5px ui-monospace, "JetBrains Mono", Consolas, monospace;
+  }
+  .label { font-size: .8rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-top: 14px; }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
+  .grid .card { margin-bottom: 0; }
+
+  .qr { display: flex; gap: 14px; align-items: center; margin-top: 14px; }
+  .qr .code { background: #fff; padding: 8px; border-radius: 10px; line-height: 0; flex: none; }
+  .qr .code img { width: 116px; height: 116px; image-rendering: pixelated; }
+  .qr p { margin: 0; color: var(--muted); font-size: .88rem; }
+
+  .note {
+    margin-top: 12px;
+    padding: 10px 12px;
+    background: var(--surface-2);
+    border-radius: 9px;
+    color: var(--muted);
+    font-size: .88rem;
+  }
+  .note.warn { background: var(--err-soft); color: var(--err); }
+
+  details summary { cursor: pointer; font-weight: 600; }
+  .changelog { margin-top: 10px; max-height: 420px; overflow: auto; font-size: .9rem; overflow-wrap: anywhere; }
+  .changelog h3, .changelog h4 { margin: 14px 0 6px; font-size: .95rem; }
+  .changelog ul { margin: 0; padding-left: 20px; }
+
+  .hidden { display: none !important; }
+  footer { color: var(--muted); font-size: .85rem; margin-top: 28px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Morphe JSON → MPP</h1>
+    <p>Paste a <code>patches-bundle.json</code>, a link to one, or a GitHub/GitLab repository. You get the <code>.mpp</code> patch bundle plus ready-made links for Morphe Desktop and Morphe Android.</p>
+  </header>
+
+  <section class="card drop" id="drop">
+    <h2>Input</h2>
+    <p class="sub">Converts automatically. You can also drop a <code>.json</code> file here.</p>
+    <textarea id="input" spellcheck="false" autocomplete="off" placeholder="https://github.com/MorpheApp/morphe-patches&#10;https://raw.githubusercontent.com/owner/repo/main/patches-bundle.json&#10;{ &quot;download_url&quot;: &quot;…/patches-1.0.0.mpp&quot;, &quot;version&quot;: &quot;1.0.0&quot; }"></textarea>
+    <div class="row space mt">
+      <div class="row">
+        <button type="button" id="paste">Paste</button>
+        <button type="button" id="pick">Open file…</button>
+        <button type="button" id="clear">Clear</button>
+        <input type="file" id="file" accept=".json,application/json" class="hidden">
+      </div>
+      <div class="row">
+        <span class="status" style="margin-right:4px">Try:</span>
+        <button type="button" class="chip" data-example="https://github.com/MorpheApp/morphe-patches">Morphe patches</button>
+      </div>
+    </div>
+    <div class="status mt" id="status" role="status" aria-live="polite"></div>
+  </section>
+
+  <div id="result" class="hidden">
+    <section class="card">
+      <h2 id="r-title">Patch bundle</h2>
+      <div class="meta" id="r-meta"></div>
+      <div class="row">
+        <a class="btn primary" id="r-download" href="#" rel="noopener">⬇ Download <span id="r-filename">.mpp</span></a>
+        <button type="button" data-copy-from="r-mpp-url">Copy .mpp URL</button>
+        <a class="btn hidden" id="r-sig" href="#" rel="noopener">Signature</a>
+      </div>
+      <div class="field">
+        <input id="r-mpp-url" readonly aria-label=".mpp download URL">
+      </div>
+    </section>
+
+    <div class="grid">
+      <section class="card">
+        <h2>📱 Morphe Android</h2>
+        <p class="sub">Opens Morphe Manager and asks to add this source, so it keeps getting updates.</p>
+        <div id="android-link-block">
+          <div class="row">
+            <a class="btn primary" id="a-open" href="#" rel="noopener">Open in Morphe</a>
+            <button type="button" data-copy-from="a-link">Copy link</button>
+          </div>
+          <div class="field"><input id="a-link" readonly aria-label="Morphe Android add-source link"></div>
+          <div class="qr">
+            <div class="code" id="a-qr"></div>
+            <p>On a computer? Scan this with your phone's camera to open it in Morphe Manager.</p>
+          </div>
+          <div class="note hidden" id="a-branch-note"></div>
+        </div>
+        <div class="note" id="android-file-block">
+          No GitHub/GitLab repository was found for this bundle, so there is no add-source link.
+          Download the <code>.mpp</code> on your phone and open it with Morphe Manager instead.
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>🖥 Morphe Desktop</h2>
+        <p class="sub">Paste this into <b>Add source</b> in Morphe Desktop, or use the downloaded file.</p>
+        <div id="desktop-link-block">
+          <div class="label">Source link</div>
+          <div class="field">
+            <input id="d-link" readonly aria-label="Morphe Desktop source link">
+            <button type="button" data-copy-from="d-link">Copy</button>
+          </div>
+        </div>
+        <div class="label">Command line</div>
+        <div class="field">
+          <input id="d-cli" readonly aria-label="Morphe Desktop CLI command">
+          <button type="button" data-copy-from="d-cli">Copy</button>
+        </div>
+        <div class="note">Or open the downloaded <code>.mpp</code> from Morphe Desktop's source picker as a local file.</div>
+      </section>
+    </div>
+
+    <section class="card mt">
+      <h2>🔗 Share this conversion</h2>
+      <p class="sub">A link to this page that converts the same input when opened.</p>
+      <div class="field">
+        <input id="s-link" readonly aria-label="Share link">
+        <button type="button" data-copy-from="s-link">Copy</button>
+      </div>
+    </section>
+
+    <section class="card hidden" id="r-changelog-card">
+      <details>
+        <summary>Release notes</summary>
+        <div class="changelog" id="r-changelog"></div>
+      </details>
+    </section>
+  </div>
+
+  <footer>Runs entirely in your browser. Not affiliated with Morphe.</footer>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  const BUNDLE_FILE = "patches-bundle.json";
+  const BRANCHES = ["main", "dev"];
+  const ADD_SOURCE = "https://morphe.software/add-source";
+
+  const $ = (id) => document.getElementById(id);
+  const input = $("input");
+  const status = $("status");
+  let runId = 0;
+
+  // ---------- helpers ----------
+
+  function setStatus(text, kind) {
+    status.textContent = text || "";
+    status.className = "status mt" + (kind ? " " + kind : "");
+  }
+
+  async function fetchJson(url) {
+    let res;
+    try {
+      res = await fetch(url, { cache: "no-store" });
+    } catch {
+      throw new Error("Could not reach " + url + " (network or CORS). Paste the JSON contents instead.");
+    }
+    if (!res.ok) throw new Error("HTTP " + res.status + " for " + url);
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error("The file at " + url + " is not valid JSON.");
+    }
+  }
+
+  async function tryFetchJson(url) {
+    try { return await fetchJson(url); } catch { return null; }
+  }
+
+  function fileName(url) {
+    try {
+      const last = new URL(url).pathname.split("/").filter(Boolean).pop() || "";
+      return decodeURIComponent(last) || "patches.mpp";
+    } catch {
+      return "patches.mpp";
+    }
+  }
+
+  function versionFromName(name) {
+    const m = name.match(/(\d+\.\d+\.\d+(?:[-.][\w.]+)?)\.mpp$/i);
+    return m ? m[1] : "";
+  }
+
+  // Repo info from any GitHub/GitLab URL: { provider, repo, branch?, path? }
+  function repoFromUrl(raw) {
+    let u;
+    try { u = new URL(raw); } catch { return null; }
+    const host = u.hostname.toLowerCase();
+    const seg = u.pathname.split("/").filter(Boolean).map(decodeURIComponent);
+
+    if (host === "raw.githubusercontent.com" && seg.length >= 4) {
+      return { provider: "github", repo: seg[0] + "/" + seg[1], branch: seg[2], path: seg.slice(3).join("/") };
+    }
+    if ((host === "github.com" || host === "www.github.com") && seg.length >= 2) {
+      const info = { provider: "github", repo: seg[0] + "/" + seg[1].replace(/\.git$/, "") };
+      if ((seg[2] === "blob" || seg[2] === "raw") && seg.length >= 5) {
+        info.branch = seg[3];
+        info.path = seg.slice(4).join("/");
+      }
+      if (seg[2] === "releases" && seg[3] === "tag" && seg[4]) info.tag = seg[4];
+      return info;
+    }
+    if (host === "gitlab.com" && seg.length >= 2) {
+      const dash = seg.indexOf("-");
+      const repoSeg = dash > 0 ? seg.slice(0, dash) : seg.slice(0, 2);
+      const info = { provider: "gitlab", repo: repoSeg.join("/") };
+      if (dash > 0 && (seg[dash + 1] === "raw" || seg[dash + 1] === "blob") && seg.length > dash + 3) {
+        info.branch = seg[dash + 2];
+        info.path = seg.slice(dash + 3).join("/");
+      }
+      return info;
+    }
+    return null;
+  }
+
+  function rawUrl(info, branch, path) {
+    if (info.provider === "github") {
+      return "https://raw.githubusercontent.com/" + info.repo + "/" + encodeURIComponent(branch) + "/" + path.split("/").map(encodeURIComponent).join("/");
+    }
+    // GitLab's raw endpoint has no CORS headers, its API does.
+    return "https://gitlab.com/api/v4/projects/" + encodeURIComponent(info.repo) +
+      "/repository/files/" + encodeURIComponent(path) + "/raw?ref=" + encodeURIComponent(branch);
+  }
+
+  function bundleFromRelease(rel) {
+    const asset = (rel.assets || []).find((a) => /\.mpp$/i.test(a.name));
+    if (!asset) return null;
+    const sig = (rel.assets || []).find((a) => a.name === asset.name + ".sig" || a.name === asset.name + ".asc");
+    return {
+      version: (rel.tag_name || "").replace(/^v/, ""),
+      created_at: rel.published_at || rel.created_at || "",
+      description: rel.body || "",
+      download_url: asset.browser_download_url,
+      signature_download_url: sig ? sig.browser_download_url : "",
+    };
+  }
+
+  // ---------- resolve input → { bundle, source } ----------
+
+  async function resolve(text) {
+    text = text.trim();
+    if (!text) return null;
+
+    if (text.startsWith("{") || text.startsWith("[")) {
+      let json;
+      try { json = JSON.parse(text); } catch (e) { throw new Error("That JSON doesn't parse: " + e.message); }
+      return { bundle: json, source: null };
+    }
+
+    // Bare "owner/repo" means GitHub, same as Morphe Desktop.
+    if (/^[a-z0-9][\w-]*\/[\w.-]+$/i.test(text) && !/\.(mpp|json)$/i.test(text)) {
+      text = "https://github.com/" + text;
+    }
+    if (!/^https?:\/\//i.test(text)) text = "https://" + text;
+
+    let url;
+    try { url = new URL(text); } catch { throw new Error("That isn't a URL or JSON."); }
+    const href = url.href;
+
+    // Morphe add-source link
+    if (url.hostname === "morphe.software" && url.pathname.startsWith("/add-source")) {
+      const gh = url.searchParams.get("github");
+      const gl = url.searchParams.get("gitlab");
+      if (!gh && !gl) throw new Error("That add-source link has no github= or gitlab= repository.");
+      return resolveRepo({ provider: gh ? "github" : "gitlab", repo: gh || gl });
+    }
+
+    // Direct .mpp link
+    if (/\.mpp$/i.test(url.pathname)) {
+      const name = fileName(href);
+      return {
+        bundle: { download_url: href, version: versionFromName(name) },
+        source: repoFromUrl(href),
+      };
+    }
+
+    const info = repoFromUrl(href);
+    if (info) {
+      if (info.path) {
+        const json = await fetchJson(rawUrl(info, info.branch, info.path));
+        return { bundle: json, source: info };
+      }
+      if (info.tag && info.provider === "github") {
+        const rel = await fetchJson("https://api.github.com/repos/" + info.repo + "/releases/tags/" + encodeURIComponent(info.tag));
+        const bundle = bundleFromRelease(rel);
+        if (!bundle) throw new Error("Release " + info.tag + " has no .mpp file attached.");
+        return { bundle, source: info };
+      }
+      return resolveRepo(info);
+    }
+
+    // Any other URL: hope it serves JSON with CORS.
+    return { bundle: await fetchJson(href), source: null };
+  }
+
+  async function resolveRepo(info) {
+    for (const branch of BRANCHES) {
+      const json = await tryFetchJson(rawUrl(info, branch, BUNDLE_FILE));
+      if (json && json.download_url) {
+        return { bundle: json, source: { ...info, branch, path: BUNDLE_FILE } };
+      }
+    }
+    if (info.provider === "github") {
+      const rel = await tryFetchJson("https://api.github.com/repos/" + info.repo + "/releases/latest");
+      const bundle = rel && bundleFromRelease(rel);
+      if (bundle) return { bundle, source: info };
+    }
+    throw new Error("No " + BUNDLE_FILE + " (main or dev branch) or .mpp release found in " + info.repo + ".");
+  }
+
+  // ---------- render ----------
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  function inlineMd(s) {
+    return escapeHtml(s)
+      .replace(/`([^`]+)`/g, "<code>$1</code>")
+      .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, (_, t, u) => '<a href="' + u + '" target="_blank" rel="noopener">' + t + "</a>");
+  }
+
+  function renderMarkdown(md) {
+    let html = "", inList = false;
+    for (const line of md.split(/\r?\n/)) {
+      const item = line.match(/^\s*[*-]\s+(.*)/);
+      if (item) {
+        if (!inList) { html += "<ul>"; inList = true; }
+        html += "<li>" + inlineMd(item[1]) + "</li>";
+        continue;
+      }
+      if (inList) { html += "</ul>"; inList = false; }
+      const h = line.match(/^(#{1,6})\s+(.*)/);
+      if (h) html += (h[1].length <= 2 ? "<h3>" : "<h4>") + inlineMd(h[2]) + (h[1].length <= 2 ? "</h3>" : "</h4>");
+      else if (line.trim()) html += "<p>" + inlineMd(line) + "</p>";
+    }
+    return html + (inList ? "</ul>" : "");
+  }
+
+  function renderQr(el, text) {
+    el.textContent = "";
+    if (typeof qrcode !== "function") { el.parentElement.classList.add("hidden"); return; }
+    const qr = qrcode(0, "M");
+    qr.addData(text);
+    qr.make();
+    el.innerHTML = qr.createImgTag(4, 0, "QR code for the Morphe add-source link");
+  }
+
+  function shareLink(raw) {
+    const base = location.href.split(/[?#]/)[0];
+    const t = raw.trim();
+    if (!t) return base;
+    if (t.startsWith("{")) {
+      // Keep shared JSON small: release notes are not needed to convert.
+      let obj = {};
+      try { obj = JSON.parse(t); } catch {}
+      const { description, ...rest } = obj;
+      const b64 = btoa(unescape(encodeURIComponent(JSON.stringify(rest))))
+        .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+      return base + "#json=" + b64;
+    }
+    return base + "?src=" + encodeURIComponent(t);
+  }
+
+  function render({ bundle, source }, raw) {
+    if (!bundle || typeof bundle !== "object" || Array.isArray(bundle)) {
+      throw new Error("Expected a JSON object like patches-bundle.json.");
+    }
+    const dl = bundle.download_url;
+    if (!dl || typeof dl !== "string") throw new Error("This JSON has no download_url, so there is no .mpp to point to.");
+    let dlUrl;
+    try { dlUrl = new URL(dl); } catch { throw new Error("download_url is not a valid URL: " + dl); }
+    if (!/^https?:$/.test(dlUrl.protocol)) throw new Error("download_url must be an http(s) link.");
+
+    // Repo can also come from the .mpp's release URL.
+    const repo = source || repoFromUrl(dl);
+    const name = fileName(dl);
+    const version = bundle.version || versionFromName(name);
+
+    $("r-title").textContent = repo ? repo.repo.split("/").pop() : name.replace(/\.mpp$/i, "");
+    const meta = [];
+    if (version) meta.push('<span class="badge">v' + escapeHtml(String(version).replace(/^v/, "")) + "</span>");
+    if (repo) meta.push('<span class="badge plain">' + escapeHtml((repo.provider === "gitlab" ? "gitlab.com/" : "github.com/") + repo.repo) + "</span>");
+    if (bundle.created_at) {
+      const d = new Date(bundle.created_at);
+      if (!isNaN(d)) meta.push('<span class="badge plain">' + escapeHtml(d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })) + "</span>");
+    }
+    $("r-meta").innerHTML = meta.join("");
+
+    $("r-download").href = dlUrl.href;
+    $("r-download").setAttribute("download", name);
+    $("r-filename").textContent = name;
+    $("r-mpp-url").value = dlUrl.href;
+
+    const sig = bundle.signature_download_url;
+    $("r-sig").classList.toggle("hidden", !sig);
+    if (sig) $("r-sig").href = sig;
+
+    // Morphe's add-source link names only the repository; the app then reads
+    // patches-bundle.json at the repo root on main/dev.
+    const addSource = repo ? ADD_SOURCE + "?" + repo.provider + "=" + repo.repo : "";
+    $("android-link-block").classList.toggle("hidden", !addSource);
+    $("android-file-block").classList.toggle("hidden", !!addSource);
+    $("desktop-link-block").classList.toggle("hidden", !addSource);
+    if (addSource) {
+      $("a-open").href = addSource;
+      $("a-link").value = addSource;
+      $("d-link").value = addSource;
+      renderQr($("a-qr"), addSource);
+      const note = $("a-branch-note");
+      const differs = repo.path && (repo.path !== BUNDLE_FILE || !BRANCHES.includes(repo.branch));
+      note.classList.toggle("hidden", !differs);
+      if (differs) {
+        note.textContent = "Heads up: you gave " + repo.branch + "/" + repo.path +
+          ", but Morphe adds the repository's own " + BUNDLE_FILE + " (main or dev branch), which may be a different release.";
+      }
+    }
+
+    $("d-cli").value = "java -jar morphe-desktop-*-all.jar patch -p " + name + " your_app.apk";
+    $("s-link").value = shareLink(raw);
+
+    const notes = typeof bundle.description === "string" ? bundle.description.trim() : "";
+    $("r-changelog-card").classList.toggle("hidden", !notes);
+    $("r-changelog").innerHTML = notes ? renderMarkdown(notes) : "";
+
+    $("result").classList.remove("hidden");
+  }
+
+  async function convert() {
+    const id = ++runId;
+    const raw = input.value;
+    if (!raw.trim()) {
+      $("result").classList.add("hidden");
+      setStatus("");
+      return;
+    }
+    setStatus("Converting…");
+    try {
+      const out = await resolve(raw);
+      if (id !== runId) return;
+      render(out, raw);
+      setStatus("✓ Ready", "ok");
+    } catch (e) {
+      if (id !== runId) return;
+      $("result").classList.add("hidden");
+      setStatus(e.message || String(e), "err");
+    }
+  }
+
+  // ---------- wiring ----------
+
+  let timer;
+  input.addEventListener("input", () => {
+    clearTimeout(timer);
+    timer = setTimeout(convert, 450);
+  });
+
+  function setInput(text) {
+    input.value = text;
+    clearTimeout(timer);
+    convert();
+  }
+
+  $("paste").addEventListener("click", async () => {
+    try {
+      setInput(await navigator.clipboard.readText());
+    } catch {
+      input.focus();
+      setStatus("Clipboard access was blocked. Press Ctrl+V / ⌘V in the box instead.", "err");
+    }
+  });
+  $("clear").addEventListener("click", () => setInput(""));
+  $("pick").addEventListener("click", () => $("file").click());
+  $("file").addEventListener("change", async (e) => {
+    const f = e.target.files[0];
+    if (f) setInput(await f.text());
+    e.target.value = "";
+  });
+  document.querySelectorAll("[data-example]").forEach((b) =>
+    b.addEventListener("click", () => setInput(b.dataset.example)));
+
+  const drop = $("drop");
+  ["dragenter", "dragover"].forEach((t) => drop.addEventListener(t, (e) => {
+    e.preventDefault();
+    drop.classList.add("dragging");
+  }));
+  ["dragleave", "drop"].forEach((t) => drop.addEventListener(t, () => drop.classList.remove("dragging")));
+  drop.addEventListener("drop", async (e) => {
+    e.preventDefault();
+    const f = e.dataTransfer.files[0];
+    if (f) setInput(await f.text());
+    else {
+      const text = e.dataTransfer.getData("text/uri-list") || e.dataTransfer.getData("text/plain");
+      if (text) setInput(text);
+    }
+  });
+
+  document.addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-copy-from]");
+    if (!btn) return;
+    const field = $(btn.dataset.copyFrom);
+    try {
+      await navigator.clipboard.writeText(field.value);
+    } catch {
+      field.select();
+      document.execCommand("copy");
+    }
+    const old = btn.textContent;
+    btn.textContent = "Copied ✓";
+    setTimeout(() => (btn.textContent = old), 1200);
+  });
+
+  // ?src=<link or json>, ?url=<link>, or #json=<base64url>
+  const params = new URLSearchParams(location.search);
+  const fromQuery = params.get("src") || params.get("url") || params.get("json");
+  const hashJson = location.hash.match(/^#json=([\w-]+)/);
+  if (hashJson) {
+    try {
+      const b64 = hashJson[1].replace(/-/g, "+").replace(/_/g, "/");
+      setInput(decodeURIComponent(escape(atob(b64))));
+    } catch {
+      setStatus("The shared link's JSON couldn't be read.", "err");
+    }
+  } else if (fromQuery) {
+    setInput(fromQuery);
+  }
+})();
+</script>
+</body>
+</html>
