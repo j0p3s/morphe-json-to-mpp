@@ -327,10 +327,10 @@
       </div>
       <div class="hidden" id="dl-output">
         <div class="row space mt">
-          <label for="dl-text">Download links and filenames</label>
+          <label for="dl-text">Direct .mpp links for JDownloader (comma-separated)</label>
           <button type="button" data-copy-from="dl-text">Copy all</button>
         </div>
-        <textarea id="dl-text" rows="8" readonly spellcheck="false" aria-label="Selected repository URLs, MPP filenames and download links"></textarea>
+        <textarea id="dl-text" rows="8" readonly spellcheck="false" aria-label="Direct MPP download URLs separated by commas"></textarea>
         <p class="sub">Suggested filenames use <code>author-repo-version-XX.mpp</code>, where XX is the JSON version. Cross-site downloads may keep the server's filename; use the name shown here when saving.</p>
       </div>
       <ol class="dl-links hidden" id="dl-links"></ol>
@@ -977,8 +977,7 @@
     $("dl-links").innerHTML = found.map((r) =>
       '<li><a href="' + escapeHtml(r.url) + '" download="' + escapeHtml(r.filename) + '" target="_blank" rel="noopener">' + escapeHtml(r.repository || r.url) + "</a> · " + escapeHtml(r.filename) + "</li>").join("");
     $("dl-links").classList.toggle("hidden", !found.length);
-    $("dl-text").value = found.map((r) =>
-      (r.repository ? r.repository + "\n" : "") + r.filename + "\n" + r.url).join("\n\n");
+    $("dl-text").value = found.map((r) => r.url).join(",");
     $("dl-output").classList.toggle("hidden", !found.length);
 
     const parts = [];
