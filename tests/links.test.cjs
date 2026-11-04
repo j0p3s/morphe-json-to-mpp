@@ -58,9 +58,9 @@ test('batch only resolves metadata, preserves order, and lists partial failures'
     { source: 'https://github.com/bob/bad' }]);
   await api.getSelectedLinks();
   assert.equal(el('dl-text').value, [
-    'https://github.com/alice/one\nalice-one-version-1.2.3.mpp\nhttps://github.com/alice/one/releases/download/v1.2.3/patches-1.2.3.mpp',
-    'https://github.com/bob/two\nbob-two-version-1.2.3.mpp\nhttps://github.com/bob/two/releases/download/v1.2.3/patches-1.2.3.mpp',
-  ].join('\n\n'));
+    'https://github.com/alice/one/releases/download/v1.2.3/patches-1.2.3.mpp',
+    'https://github.com/bob/two/releases/download/v1.2.3/patches-1.2.3.mpp',
+  ].join(','));
   assert.match(el('dl-links').innerHTML, /download="alice-one-version-1.2.3.mpp"/);
   assert.match(el('dl-status').textContent, /No downloads started/);
   assert.match(el('dl-status').textContent, /Couldn't find a .mpp for: https:\/\/github.com\/bob\/bad/);
